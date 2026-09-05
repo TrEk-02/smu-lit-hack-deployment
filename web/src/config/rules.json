@@ -23,7 +23,7 @@
       "onFail": "FAIL",
       "plainExplanation": "The Small Claims Tribunals can only hear claims up to S$30,000, and only above S$20,000 if both parties agree in writing. Claims above S$30,000 must go to another court.",
       "missingMessage": "Roughly how much money are you asking the other party to pay you?",
-      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (prescribed limit) — VERIFY", "url": "" }
+      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (prescribed limit)", "url": "" }
     },
     {
       "scope": "general",
@@ -38,7 +38,7 @@
       "onFail": "CONDITIONAL",
       "plainExplanation": "Claims between S$20,000 and S$30,000 can only be heard at the Small Claims Tribunals if the other party agrees in writing to the higher limit.",
       "missingMessage": "Roughly how much money are you asking the other party to pay you?",
-      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (consent to higher limit) — VERIFY", "url": "" }
+      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (consent to higher limit)", "url": "" }
     },
     {
       "scope": "general",
@@ -53,7 +53,7 @@
       "onFail": "FAIL",
       "plainExplanation": "A claim must be filed at the Small Claims Tribunals within 2 years of the date the dispute arose. Older disputes cannot be heard there.",
       "missingMessage": "When did the problem first happen — for example, when was the payment due, or when did you receive the faulty goods?",
-      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "limitation period — VERIFY", "url": "" }
+      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "limitation period", "url": "" }
     }
   ],
 
