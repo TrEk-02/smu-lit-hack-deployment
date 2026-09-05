@@ -378,7 +378,7 @@ they can just double down":
   disagree with what you told us"* vs *"because you left this blank"*.
 - **Stop mixing two products.** Contradictions and missing-answer follow-ups
   currently arrive looking identical, which dilutes both. Split the round:
-  *"2 things don't match what you told us"* then *"3 things we still need"*.
+  *"XX things don't match what you told us"* then *"YY things we still need"*.
 - Same split on the evidence page: contradictions expanded, corroborations
   collapsed under "N things your document backs up".
 - Stress-test the user journey end to end, including a claimant who rejects
