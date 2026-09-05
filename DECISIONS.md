@@ -88,7 +88,16 @@ from "what they invoiced" when reading a document.
 
 **Build**: ~15 min. Form fields + wiring into `answers{}`. 
 
-**Success**: a respondent's information is recorded
+**Success**: a respondent's information is recorded — [x] done
+
+**What was built**: fields Q4/Q4Bi/Q4Bii/Q5/Q6 from legal's question set, as a
+new `partyFields` array in rules.json — deliberately *not* gates (no
+operator/onFail/source), because these are intake, not eligibility checks.
+New `text` answerType; new `dependsOn` for the Q4B conditional. Q7 re-renders
+the existing `claimAmount` question rather than duplicating the field. Q8
+computes the filing fee from the official schedule (`lib/filing-fee.ts`:
+≤$5k $10/$50, ≤$10k $20/$100, ≤$30k 1%/3% — individual/entity), which is why
+Q4 has to be answered before the fee can show.
 
 ### Feature: Evidence layer (document-vs-answer checking)
 **Why**: Sprint 1 verdicts are self-report. `evaluate()` is deterministic about the
@@ -157,13 +166,57 @@ Asserted / Corroborated / Contradicted. This is the honesty axis as UI rather
 than as a slide claim.
 
 **Success criteria**:
-- [ ] One contradiction surfaced from an uploaded document, page-anchored quote,
+- [x] One contradiction surfaced from an uploaded document, page-anchored quote,
       zero LLM legal claims in output
-- [ ] Quote verification demonstrably rejects a fabricated citation in a test
+- [x] Quote verification demonstrably rejects a fabricated citation in a test
 - [ ] Confirmed correction merges into `answers{}` and re-runs `evaluate()`
-- [ ] One visible refusal path
-- [ ] Whole flow renders with the LLM call stubbed
-- [ ] Scenario B end-to-end in under 90s
+      — deferred to the challenge round (Feature 3); this feature surfaces
+      findings, it does not take an answer back
+- [x] One visible refusal path — three: 503 not configured, 502 unverifiable
+      output, and an explicit "nothing we could verify" instead of silence
+- [x] Whole flow renders with the LLM call stubbed
+- [x] Scenario B end-to-end in under 90s — the model call is ~10s
+
+**What was built** (2026-09-05):
+
+*Model*: `anthropic/claude-sonnet-5` via OpenRouter, `OPENROUTER_MODEL`-overridable.
+Chosen over Sonnet 4.6 because it is both newer and cheaper ($2/$10 vs $3/$15 per
+1M). Two live-verified constraints: it **rejects `temperature`/`top_p`** (sampling
+params removed on Sonnet 5), and default reasoning effort took ~30s, so we send
+`reasoning: {effort: "low"}` — ~10s, and it actually found *more*. ~$0.02/call.
+
+*Legal's evidence blocks* arrived as a PDF, not a rules.json edit, and were not
+valid JSON (blocks outside their gate objects, curly quotes, a stray `]`).
+Transcribed gate-by-gate into 22 gates. Three deviations from the plan above:
+- **`onContradiction` was omitted on every block.** Legal marked all of them
+  `correctable: true`, and ESCALATE requires `correctable: false`, so CORRECT is
+  the only consistent value — the field now defaults to it. The cross-check
+  rejecting `correctable: true` + ESCALATE still stands.
+- **`docTypes` is free text, not the planned `DocType` enum.** Legal authored
+  descriptions ("Value in dollar", "Number of items"), not document formats. An
+  enum would have rejected their content; ingest never needed it.
+- **Everything is `checkable: true`** (plan said default false, promote ~6). Kept
+  as authored; the cap of 8 plus contradictions-first ranking absorbs the noise.
+
+*Payment trio, re-anchored — legal to confirm*: the `expect` strings were attached
+one gate late. The block on `boc_payment_evidence` described *form of payment*
+(that is `boc_payment_form`, which had none) and the block on `boc_payment_due`
+described *proof of transfer* (that is `boc_payment_evidence`). Two of the three
+are published, and `expect` drives finding quality, so leaving it would have aimed
+the model at the wrong thing on live gates. Both moved; **`boc_payment_due`'s block
+is newly authored by dev and needs legal sign-off.**
+
+*Question wording NOT applied*: legal's PDF also rewrites `question`/`missingMessage`
+on ~15 gates. Several break the question against its own answer type
+(`boc_subject_matter`, `boc_delivery_date`, `boc_quantity`,
+`boc_claimant_preconditions` pair an open "what/how" question with yes-no or
+"Yes — …" options), and **`boc_price_agreed` inverts polarity** — "Were there *any
+changes* to the price?" still PASSes on `true`. Sprint 1 wording stands until legal
+fixes these.
+
+*Stub-on-no-key*: with no API key the pipeline returns a fixture rather than an
+error, quoting the real document so verification still runs honestly. The UI
+labels it "Demo fixture — pre-recorded, not a live assessment", per §8.
 
 **Cut order if the LLM slips at 90 min**: drop the challenge round (2.4), keep
 upload (2.2) + discrepancy detection (2.3). Discrepancy detection alone carries
@@ -218,12 +271,64 @@ user said no — a real person should see both.
 re-evaluate. Reuses the Sprint 1 form controls per `answerType`.
 
 **Success**:
-- [ ] A confirmed correction visibly changes the eligibility verdict on screen
-- [ ] Rejecting a correction leaves the answer intact and the badge Contradicted
-- [ ] Round terminates in ≤5 questions with no dead end
-- [ ] Every document-driven question shows a verified quote
-- [ ] Works with the LLM stubbed — WEAKNESS/INCOMPLETE questions come from
+- [x] A confirmed correction visibly changes the eligibility verdict on screen
+- [x] Rejecting a correction leaves the answer intact and the badge Contradicted
+- [x] Round terminates in ≤5 questions with no dead end
+- [x] Every document-driven question shows a verified quote
+- [x] Works with the LLM stubbed — WEAKNESS/INCOMPLETE questions come from
       `rules.json` alone, so the round is never empty
+
+**What was built** (2026-09-05):
+
+Queue built **once** by `/api/challenge` and then walked — not re-derived
+between answers, which is what makes "terminates in ≤5" provable rather than
+hopeful. Server-side because `missingMessage` (legal's "if unknown" question)
+only reaches the client on a MISSING result, not a WEAKNESS one; `evaluate.ts`
+is untouched.
+
+*Ranking*, as specified, plus one addition: a contradiction on a gate that did
+**not** pass ranks third (after the two passed-gate sources, before `unclear`).
+Dropping a verified contradiction just because its gate already failed would
+contradict the same principle that keeps rejected corrections in the handoff.
+
+*Two gaps Feature 2 left, now closed*: the `provenance` map was computed but
+never rendered — it now appears on review as "You said so / Backed by your
+document / Your document disagrees"; and findings were trapped in
+`EvidencePanel` local state, now lifted to `page.tsx`.
+
+### Prompt payload change — `answerFormat` added
+
+§Evidence said the payload is `{ id, question, userAnswer, expect }` and nothing
+else. It now also carries **`answerFormat`** — "exactly true or false", "a
+number", or the list of select values with their labels.
+
+Why: without it the model could not tell whether an item wanted Yes/No, a
+number, or one of a fixed list, so it returned `proposedAnswer: null` on *every*
+finding. Measured, not guessed — before the change, zero of three contradictions
+carried a usable proposal, so the one-click "Yes — use my document" correction
+never appeared and the claimant had to retype every answer. After, all three did.
+
+This does not weaken the guarantee the original rule protects. `operator`,
+`value`, `onFail`, `source` and `plainExplanation` are still withheld, so the
+model still cannot see which answer passes, and still cannot invent a provision.
+`answerFormat` is the same set of choices already on screen in the intake form.
+
+### Correction for legal — the claimAmount lever does not work yet
+
+An earlier note suggested Scenario B hinge on `claimAmount` crossing the
+S$30,000 cap. **That will not fire.** Legal labelled only the *category* gates
+with `evidence` blocks — both general gates (`gen_claim_amount_max`,
+`gen_limitation_period`) are `checkable: false` by omission, so no document is
+ever checked against them and no correction can be proposed for them.
+
+Two ways to get the verdict-flip demo:
+- add an `evidence` block to `gen_claim_amount_max` (then a document showing a
+  figure over S$30,000 flips PASS → FAIL), or
+- build Scenario B on **`boc_consideration`** or **`boc_proof_of_agreement`** —
+  the only published gates that are both checkable and FAIL-severity. This is
+  what the flip was verified against: a delivery note reading "supplied free of
+  charge… no price was agreed" contradicts "a price was clearly agreed", and
+  confirming it takes the claim PASS → FAIL mid-round.
 
 **Sprint 3**: 1.5 hours, building the features for Epic 3
 
