@@ -12,6 +12,8 @@ import { AnswerInput, type FormQuestion } from "./answer-input";
 import type { ChallengeQuestion } from "@/lib/challenge";
 import type { Provenance } from "@/lib/llm/provenance";
 import { computeFilingFee } from "@/lib/filing-fee";
+import { applicability } from "@/lib/applicability";
+import { reviewStatus } from "@/lib/review-status";
 import type {
   AnswerValue,
   Answers,
@@ -110,6 +112,13 @@ export default function Home() {
     field: string,
     value: string | number | boolean | null
   ) {
+    if (setter === setAnswers || setter === setCategoryAnswers) {
+      setVerdict(null);
+      setEvidenceResult(null);
+      setChallengeQuestions([]);
+      setDisagreements([]);
+      setVerdictChanged(false);
+    }
     setter((previous) => ({
       ...previous,
       [field]: value,
@@ -334,6 +343,30 @@ export default function Home() {
     return partyAnswers[question.dependsOn.field] === question.dependsOn.value;
   }
 
+  async function submitParty(event: FormEvent) {
+    event.preventDefault();
+    try {
+      setSubmitting(true);
+      setError(null);
+      const response = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generalAnswers: answers, categoryId: selectedCategory, categoryAnswers }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to re-check your answers.");
+      const result = data as EvaluateResponse;
+      setVerdict(result);
+      if (result.general.status === "INCOMPLETE") setStep("general");
+      else if (result.category?.status === "INCOMPLETE") setStep("category");
+      else setStep("review");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to re-check your answers.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const filingAs = partyAnswers.filingAs;
   const claimAmount = answers.claimAmount;
   const filingFee =
@@ -441,7 +474,7 @@ export default function Home() {
 
   /** Re-run the deterministic engine over the corrected answers. */
   async function reEvaluate(nextGeneral: Answers, nextCategory: Answers) {
-    const before = verdict?.category?.status ?? verdict?.general.status;
+    const before = verdict ? reviewStatus(verdict) : undefined;
 
     const response = await fetch("/api/evaluate", {
       method: "POST",
@@ -453,40 +486,40 @@ export default function Home() {
       }),
     });
     const data = await response.json();
-    if (!response.ok) return;
+    if (!response.ok) throw new Error(data.error ?? "Unable to re-check your answers. Please try again.");
 
     const next = data as EvaluateResponse;
     setVerdict(next);
 
-    const after = next.category?.status ?? next.general.status;
+    const after = reviewStatus(next);
     if (before && after !== before) setVerdictChanged(true);
   }
 
-  function applyOutcome(outcome: ChallengeOutcome) {
+  async function applyOutcome(outcome: ChallengeOutcome) {
     const { question } = outcome;
 
     // Where a confirmed answer lands depends on which phase owns the gate.
-    const writeAnswer = (value: AnswerValue) => {
+    const writeAnswer = async (value: AnswerValue) => {
       const next =
         question.scope === "general"
           ? { general: { ...answers, [question.field]: value }, category: categoryAnswers }
           : { general: answers, category: { ...categoryAnswers, [question.field]: value } };
 
+      await reEvaluate(next.general, next.category);
       if (question.scope === "general") setAnswers(next.general);
       else setCategoryAnswers(next.category);
 
-      reEvaluate(next.general, next.category);
     };
 
     switch (outcome.type) {
       case "CONFIRMED":
       case "ANSWERED":
-        writeAnswer(outcome.value);
+        await writeAnswer(outcome.value);
         break;
 
       case "UNKNOWN":
         // null is "they said they don't know" — MISSING, never a false clearance.
-        writeAnswer(null);
+        await writeAnswer(null);
         break;
 
       case "REJECTED":
@@ -528,6 +561,8 @@ export default function Home() {
         </nav>
 
         <ChallengePanel
+          generalAnswers={answers}
+          categoryAnswers={categoryAnswers}
           questions={challengeQuestions}
           onOutcome={applyOutcome}
           onFinish={() => setStep("review")}
@@ -535,7 +570,7 @@ export default function Home() {
             verdictChanged && verdict ? (
               <div className="warning">
                 Your eligibility result changed to{" "}
-                <strong>{verdict.category?.status ?? verdict.general.status}</strong> based
+                <strong>{reviewStatus(verdict)}</strong> based
                 on what you just confirmed.
               </div>
             ) : null
@@ -588,22 +623,18 @@ export default function Home() {
 
           <div className="verdict">
             <div className="badge">
-              {verdict.category
-                ? verdict.category.status
-                : verdict.general.status}
+              {reviewStatus(verdict)}
             </div>
 
             <h2>
               {getStatusHeading(
-                verdict.category?.status ??
-                  verdict.general.status
+                reviewStatus(verdict)
               )}
             </h2>
 
             <p>
               {getStatusDescription(
-                verdict.category?.status ??
-                  verdict.general.status
+                reviewStatus(verdict)
               )}
             </p>
           </div>
@@ -657,15 +688,17 @@ export default function Home() {
             <button
               className="secondary"
               onClick={() => {
-                setStep(
-                  verdict.category
-                    ? "party"
-                    : "general"
-                );
+                setStep("general");
               }}
             >
               Edit answers
             </button>
+
+            {verdict.category && (
+              <button className="secondary" onClick={() => setStep("party")}>
+                Edit party details
+              </button>
+            )}
 
             <button
               className="secondary"
@@ -715,9 +748,13 @@ export default function Home() {
           <h1>Tell us what your claim is about</h1>
 
           <p className="intro">
-            Your general eligibility checks have cleared.
-            Now answer the questions specific to your claim.
+            Now answer the questions specific to your claim. Any conditions from
+            the general checks still need to be met.
           </p>
+
+          {verdict?.general.conditional.map((result) => (
+            <div className="warning" key={result.gateId}>{result.explanation}</div>
+          ))}
 
           {error && (
             <div className="error">
@@ -835,7 +872,7 @@ export default function Home() {
   /*
    * ------------------------------------------------------------
    * PARTY & FILING DETAILS STEP (Sprint 2)
-   * Pure data capture — no eligibility gates, no /api/evaluate call.
+   * Party data stays local; the editable claim amount is re-evaluated on submit.
    * ------------------------------------------------------------
    */
 
@@ -868,15 +905,13 @@ export default function Home() {
 
           <p className="intro">
             This records who is filing and who the claim is against.
-            It does not affect your eligibility result.
+            Party details do not change eligibility. If you edit the claim amount,
+            we will re-check it before showing your review.
           </p>
 
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              setStep("review");
-            }}
-          >
+          {error && <div className="error">{error}</div>}
+
+          <form onSubmit={submitParty}>
             {(config?.partyQuestions ?? [])
               .filter(partyFieldVisible)
               .map((question) =>
@@ -885,6 +920,8 @@ export default function Home() {
 
             {claimAmountQuestion &&
               renderQuestion(claimAmountQuestion, answers, setAnswers)}
+
+            <p className="hint">Changing the amount re-checks general eligibility when you continue. You may need to answer the memorandum question.</p>
 
             <div className="field">
               <label>Filing / processing fee</label>
@@ -895,8 +932,8 @@ export default function Home() {
               </p>
             </div>
 
-            <button type="submit" disabled={filingFee === null}>
-              Continue to review →
+            <button type="submit" disabled={filingFee === null || submitting}>
+              {submitting ? "Checking..." : "Continue to review →"}
             </button>
           </form>
         </section>
@@ -957,7 +994,9 @@ export default function Home() {
           )}
 
           <form onSubmit={submitGeneral}>
-            {(config?.generalQuestions ?? []).map(
+            {(config?.generalQuestions ?? []).filter((question) =>
+              applicability(question.appliesWhen, answers) === "APPLIES"
+            ).map(
               (question) =>
                 renderQuestion(
                   question,

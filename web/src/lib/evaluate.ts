@@ -14,7 +14,8 @@ import {
   type PhaseVerdict,
   type PublishedGate,
   type Verdict,
-} from "./types";
+} from "./types.ts";
+import { applicability } from "./applicability.ts";
 
 /* ------------------------------------------------------------
  * Pure interpreter. No I/O, no parsing — inputs are already
@@ -59,7 +60,7 @@ function evaluateGate(gate: PublishedGate, answers: Answers): GateResult {
   }
 
   const passed = compare(raw, gate.operator, gate.value);
-  return { ...base, outcome: passed ? "PASS" : gate.onFail, explanation: gate.plainExplanation };
+  return { ...base, outcome: passed ? "PASS" : gate.onFail, explanation: passed ? gate.passExplanation ?? gate.plainExplanation : gate.plainExplanation };
 }
 
 function deriveStatus(results: GateResult[]): PhaseStatus {
@@ -77,7 +78,11 @@ export function evaluateGates(gates: Gate[], answers: Answers): PhaseVerdict {
     // exactly the false-confidence failure the brief warns about.
     throw new Error("evaluateGates: no published gates to evaluate");
   }
-  const results = published.map((g) => evaluateGate(g, answers));
+  // UNKNOWN prerequisites are represented by their own MISSING gate result.
+  // Never assess a hidden follow-up using a stale answer from another branch.
+  const results = published
+    .filter((g) => applicability(g.appliesWhen, answers) === "APPLIES")
+    .map((g) => evaluateGate(g, answers));
   return {
     status: deriveStatus(results),
     results,

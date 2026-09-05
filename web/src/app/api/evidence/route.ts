@@ -9,6 +9,7 @@ import { provenanceByGate } from "@/lib/llm/provenance";
 import { rankFindings } from "@/lib/llm/rank";
 import { verifyFindings } from "@/lib/llm/verify";
 import type { Answers } from "@/lib/types";
+import { applicability } from "@/lib/applicability";
 
 /**
  * POST /api/evidence
@@ -40,10 +41,13 @@ export async function POST(req: Request) {
   const { generalAnswers, categoryId, categoryAnswers, doc } = parsed.data;
 
   // One flat view: gates are keyed by field, and a field is a field.
-  const answers: Answers = { ...generalAnswers, ...(categoryAnswers ?? {}) };
+  const answers: Answers = { ...(categoryAnswers ?? {}), ...generalAnswers };
 
   // ---- What is worth asking about ---------------------------------
-  const gates = checkableGates(categoryId);
+  const gates = checkableGates(categoryId).filter((gate) =>
+    applicability(gate.appliesWhen, gate.scope === "general" ? generalAnswers : categoryAnswers ?? {}) === "APPLIES"
+  );
+  const allowedGateIds = new Set(gates.map((gate) => gate.id));
   if (gates.length === 0) {
     return json<ApiError>(
       { error: "No gates in this claim type have been labelled for document checking yet." },
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
 
   // ---- 2. Quote verification --------------------------------------
   const { kept, dropped } = verifyFindings(output.findings, doc.pages);
-  const ranked = rankFindings(kept, passedGateIds);
+  const ranked = rankFindings(kept.filter((finding) => allowedGateIds.has(finding.gateId)), passedGateIds);
 
   // ---- 3/4/5. Coerce, join, route ---------------------------------
   const findings: EvidenceFinding[] = [];
@@ -118,6 +122,7 @@ export async function POST(req: Request) {
     docId: doc.docId,
     findings,
     unclear: output.unclear
+      .filter((item) => allowedGateIds.has(item.gateId))
       .map((item) => ({
         gateId: item.gateId,
         question: gateById(item.gateId)?.question ?? "",

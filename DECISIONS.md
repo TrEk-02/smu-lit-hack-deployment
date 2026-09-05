@@ -422,6 +422,58 @@ truly blocks.
 them — which is why a document showing a figure over S$30,000 cannot flip the
 verdict.
 
+#### F5 implementation — Ding Jie's clarified requirements (2026-09-06)
+
+Implemented the supplied requirements across the general form, evaluator,
+evidence scope and review. These replace the earlier age severity and the
+"publish, don't build" instruction for the drafted amount-consent gate.
+
+- Above S$20,000 and up to S$30,000: ask whether both parties signed the
+  memorandum of understanding. Yes passes, No is CONDITIONAL, unanswered is
+  INCOMPLETE. The question does not apply at S$20,000 or above S$30,000;
+  amounts above S$30,000 still FAIL the existing cap.
+- Ask whether the claimant is **18 or older** (18 is included). This is an
+  answered-age selector, with both Yes and No accepted. Under 18 reveals a
+  parent/guardian representation gate: Yes passes, No FAILs, unknown blocks.
+- Respondent outside Singapore: FAIL.
+- Respondent bankrupt or insolvent: CONDITIONAL, showing exactly:
+  "You need to obtain permission from the Official Assignee to file the claim /
+  Official Receiver or Liquidator to file the claim (Corporate Entity)."
+  Permission status is not collected in this increment.
+- Claimant has already started court proceedings about the same dispute or
+  claim: FAIL.
+
+There are eight published general gate records, including the age selector
+and its conditional representation check. `appliesWhen` is shared by frontend
+visibility and server evaluation/evidence/challenge scoping. Its prerequisites
+must be unconditional published questions in the same phase; hidden answers
+are ignored. Boolean list membership supports the age selector without
+treating being under 18 itself as a failure. `passExplanation` avoids showing
+failure/permission instructions on a passing general gate.
+
+The party screen re-evaluates edited amounts and returns to general questions
+when the memorandum answer is needed. Review uses the most restrictive phase
+status so a category PASS does not hide a general condition. Challenge writes
+wait for re-evaluation and surface failures; newly required questions can be
+answered through Edit answers on review.
+
+Every general gate now has an explicit evidence block. Amount, memorandum,
+representation, respondent location, insolvency and proceedings can be checked
+against explicit document statements. Age and limitation remain uncheckable:
+date calculation/identity verification and legal accrual assessment are not
+implemented. Document silence is not evidence of a negative answer; an invoice
+total alone is not the claim amount. These new evidence expectations are
+developer-authored and need legal review. New source labels identify the
+project team's F5 requirements; no unverified statutory citations were invented.
+Legal still needs to confirm terminology, references and evidence wording.
+
+F5 boundary/branch regression tests live in `src/lib/evaluate.test.ts`.
+The npm test glob uses double quotes so Windows runs the tests instead of
+silently discovering zero. Validation: 33 unit tests, production build, API
+requests covering the branches, and a headless browser walkthrough of minor
+representation, memorandum boundaries, party amount edits and insolvency copy.
+Evidence API validation used the labelled stub, not a paid live model call.
+
 ### F6. Review page — readable labels and colour (Ding Jie)
 
 - `GateResult` carries `question` from the server. The client has no rules

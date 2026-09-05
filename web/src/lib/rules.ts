@@ -57,6 +57,7 @@ export function toQuestions(gates: Gate[]): Question[] {
       answerType: g.answerType,
       options: g.options,
       gateIds: [g.id],
+      appliesWhen: g.appliesWhen,
     });
   }
   return [...byField.values()];

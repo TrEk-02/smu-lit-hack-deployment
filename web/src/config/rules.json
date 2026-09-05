@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-05",
+  "version": "2026-09-06",
 
   "categories": [
     {
@@ -22,23 +22,43 @@
       "value": 30000,
       "onFail": "FAIL",
       "plainExplanation": "The Small Claims Tribunals can only hear claims up to S$30,000, and only above S$20,000 if both parties agree in writing. Claims above S$30,000 must go to another court.",
+      "passExplanation": "Your stated claim amount is within the S$30,000 cap. Above S$20,000, the signed memorandum requirement is checked separately.",
       "missingMessage": "Roughly how much money are you asking the other party to pay you?",
-      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (prescribed limit)", "url": "" }
+      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (prescribed limit)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "An explicit total amount the claimant is seeking in this dispute. An invoice total or contract price alone is not necessarily the amount claimed; do not substitute it unless the document explicitly identifies it as the claim amount.",
+        "docTypes": ["claim summary", "letter of demand"],
+        "correctable": true,
+        "onContradiction": "CORRECT"
+      }
     },
     {
       "scope": "general",
       "id": "gen_claim_amount_consent",
-      "status": "draft",
-      "description": "Pairs with gen_claim_amount_max: between S$20k and S$30k the claim is CONDITIONAL on the other party's written consent.",
-      "question": "How much are you claiming, in Singapore dollars?",
-      "field": "claimAmount",
-      "answerType": "number",
-      "operator": "lte",
-      "value": 20000,
+      "status": "published",
+      "description": "F5: signed memorandum required only above S$20,000 and up to S$30,000.",
+      "question": "Have both parties signed the memorandum of understanding for the claim above S$20,000 and up to S$30,000?",
+      "field": "memorandumSigned",
+      "answerType": "boolean",
+      "operator": "eq",
+      "value": true,
+      "appliesWhen": [
+        { "field": "claimAmount", "operator": "gt", "value": 20000 },
+        { "field": "claimAmount", "operator": "lte", "value": 30000 }
+      ],
       "onFail": "CONDITIONAL",
-      "plainExplanation": "Claims between S$20,000 and S$30,000 can only be heard at the Small Claims Tribunals if the other party agrees in writing to the higher limit.",
-      "missingMessage": "Roughly how much money are you asking the other party to pay you?",
-      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "s 5 (consent to higher limit)", "url": "" }
+      "plainExplanation": "For a claim above S$20,000 and up to S$30,000, both parties need to sign the memorandum of understanding before the claim can proceed at the higher limit.",
+      "passExplanation": "You confirmed that both parties have signed the memorandum of understanding for the higher claim limit.",
+      "missingMessage": "Have both parties signed the memorandum of understanding? Select Yes, No, or leave unanswered if you do not know.",
+      "source": { "title": "Project team's F5 requirements", "provision": "Signed memorandum for the higher claim limit", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "Explicit text recording that both parties signed the memorandum for this claim's higher limit, or explicitly stating that a party has not signed. A document title or empty signature fields alone do not establish signature status. Do not infer the validity of a signature.",
+        "docTypes": ["memorandum of understanding", "written confirmation of signing"],
+        "correctable": true,
+        "onContradiction": "CORRECT"
+      }
     },
     {
       "scope": "general",
@@ -52,8 +72,126 @@
       "value": true,
       "onFail": "FAIL",
       "plainExplanation": "A claim must be filed at the Small Claims Tribunals within 2 years of the date the dispute arose. Older disputes cannot be heard there.",
+      "passExplanation": "You said the events happened within the last 2 years.",
       "missingMessage": "When did the problem first happen — for example, when was the payment due, or when did you receive the faulty goods?",
-      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "limitation period", "url": "" }
+      "source": { "title": "Small Claims Tribunals Act 1984", "provision": "limitation period", "url": "" },
+      "evidence": {
+        "checkable": false,
+        "reason": "The current intake records a yes/no answer, not an accrual date or intended filing date. Do not infer the limitation period from an arbitrary date in a document."
+      }
+    },
+    {
+      "scope": "general",
+      "id": "gen_claimant_age",
+      "status": "published",
+      "description": "Age branch selector. Both boolean answers are valid; a minor must satisfy the separate representation gate.",
+      "question": "Are you aged 18 or older?",
+      "field": "claimantIs18OrOlder",
+      "answerType": "boolean",
+      "operator": "in",
+      "value": [true, false],
+      "onFail": "FAIL",
+      "plainExplanation": "We need to know whether you are aged 18 or older to check whether parent or guardian representation is required.",
+      "passExplanation": "Your age group is recorded. If you are under 18, parent or guardian representation is checked separately.",
+      "missingMessage": "Are you aged 18 or older? If you are under 18, select No to answer the representation question.",
+      "source": { "title": "Project team's F5 requirements", "provision": "Age and parent or guardian representation", "url": "" },
+      "evidence": {
+        "checkable": false,
+        "reason": "Age is collected directly from the claimant. Date-of-birth calculation and identity verification are not implemented."
+      }
+    },
+    {
+      "scope": "general",
+      "id": "gen_minor_representation",
+      "status": "published",
+      "description": "F5: a claimant under 18 without parent or guardian representation fails.",
+      "question": "Will a parent or guardian represent you in this claim?",
+      "field": "hasParentOrGuardianRepresentation",
+      "answerType": "boolean",
+      "operator": "eq",
+      "value": true,
+      "onFail": "FAIL",
+      "appliesWhen": [{ "field": "claimantIs18OrOlder", "operator": "eq", "value": false }],
+      "plainExplanation": "If you are under 18, you need a parent or guardian to represent you. Without that representation, this claim does not pass the eligibility check.",
+      "passExplanation": "You confirmed that a parent or guardian will represent you in this claim.",
+      "missingMessage": "Will a parent or guardian represent you? Select Yes or No, or leave unanswered if you do not know.",
+      "source": { "title": "Project team's F5 requirements", "provision": "Representation of a claimant under 18", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "Explicit written confirmation that a named parent or guardian will or will not represent the claimant in this specific claim. A family relationship alone does not establish representation. Do not assess legal authority or appointment validity.",
+        "docTypes": ["written confirmation of representation"],
+        "correctable": true,
+        "onContradiction": "CORRECT"
+      }
+    },
+    {
+      "scope": "general",
+      "id": "gen_respondent_in_singapore",
+      "status": "published",
+      "description": "F5: respondent outside Singapore is a hard stop.",
+      "question": "Is the respondent in Singapore?",
+      "field": "respondentInSingapore",
+      "answerType": "boolean",
+      "operator": "eq",
+      "value": true,
+      "onFail": "FAIL",
+      "plainExplanation": "The respondent must be in Singapore for this claim to pass the eligibility check.",
+      "passExplanation": "You confirmed that the respondent is in Singapore.",
+      "missingMessage": "Is the respondent in Singapore? Leave unanswered if you cannot confirm this.",
+      "source": { "title": "Project team's F5 requirements", "provision": "Respondent in Singapore", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "An explicit statement of the respondent's current presence or location in Singapore or outside Singapore. An old invoice address, nationality, or overseas bank account alone does not establish current location.",
+        "docTypes": ["current correspondence confirming location"],
+        "correctable": true,
+        "onContradiction": "CORRECT"
+      }
+    },
+    {
+      "scope": "general",
+      "id": "gen_respondent_insolvency",
+      "status": "published",
+      "description": "F5: bankruptcy or insolvency requires permission; remains CONDITIONAL without collecting permission status.",
+      "question": "Is the respondent bankrupt or insolvent?",
+      "field": "respondentBankruptOrInsolvent",
+      "answerType": "boolean",
+      "operator": "eq",
+      "value": false,
+      "onFail": "CONDITIONAL",
+      "plainExplanation": "You need to obtain permission from the Official Assignee to file the claim / Official Receiver or Liquidator to file the claim (Corporate Entity).",
+      "passExplanation": "You said the respondent is not bankrupt or insolvent.",
+      "missingMessage": "Is the respondent bankrupt or insolvent? Leave unanswered if you do not know rather than assuming No.",
+      "source": { "title": "Project team's F5 requirements", "provision": "Permission where the respondent is bankrupt or insolvent", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "An explicit current bankruptcy or insolvency status statement identifying this respondent. Non-payment, financial difficulty, or silence does not establish bankruptcy or insolvency. Do not determine whether permission is legally required or has been validly granted.",
+        "docTypes": ["bankruptcy or insolvency status notice", "official status record"],
+        "correctable": true,
+        "onContradiction": "CORRECT"
+      }
+    },
+    {
+      "scope": "general",
+      "id": "gen_existing_proceedings",
+      "status": "published",
+      "description": "F5: claimant has already started court proceedings about the same dispute or claim.",
+      "question": "Have you started any court proceedings about the same dispute or claim?",
+      "field": "hasExistingCourtProceedings",
+      "answerType": "boolean",
+      "operator": "eq",
+      "value": false,
+      "onFail": "FAIL",
+      "plainExplanation": "You have already started court proceedings about the same dispute or claim, so this claim does not pass the eligibility check.",
+      "passExplanation": "You said you have not started court proceedings about the same dispute or claim.",
+      "missingMessage": "Have you started court proceedings about this same dispute or claim? A complaint or demand letter is not itself court proceedings.",
+      "source": { "title": "Project team's F5 requirements", "provision": "Existing court proceedings concerning the same dispute or claim", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "An explicit statement that the claimant has or has not started court proceedings identifying this same dispute or claim. Do not treat a complaint, demand letter, threat to sue, or unrelated court case as proceedings about this claim. Silence is not evidence that no proceedings exist.",
+        "docTypes": ["court filing acknowledgment", "correspondence identifying proceedings"],
+        "correctable": true,
+        "onContradiction": "CORRECT"
+      }
     }
   ],
 

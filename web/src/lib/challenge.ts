@@ -2,7 +2,7 @@
 // `node --test` type stripping, where relative runtime imports need one.
 // Type-only imports are erased, so they don't.
 import { formatAnswer } from "./format.ts";
-import type { AnswerType, AnswerValue, Answers, Option, Source } from "./types";
+import type { AnswerType, AnswerValue, Answers, ApplicabilityCondition, Option, Source } from "./types";
 
 /* ============================================================
  * THE CHALLENGE ROUND — question builder
@@ -29,6 +29,7 @@ export type ChallengeKind =
   | "FOLLOW_UP";
 
 export type ChallengeQuestion = {
+  appliesWhen?: ApplicabilityCondition[];
   /** Stable key. One question per gate, so the gate id carries it. */
   id: string;
   gateId: string;
@@ -69,6 +70,7 @@ export type FindingLike = {
 
 /** The gate fields the builder needs. `PublishedGate` satisfies it. */
 export type GateLike = {
+  appliesWhen?: ApplicabilityCondition[];
   id: string;
   scope: "general" | "category";
   field: string;
@@ -122,6 +124,7 @@ export function buildQuestions(
   };
 
   const base = (gate: GateLike) => ({
+    appliesWhen: gate.appliesWhen,
     id: gate.id,
     gateId: gate.id,
     field: gate.field,

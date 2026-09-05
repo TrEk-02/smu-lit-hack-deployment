@@ -4,6 +4,7 @@ import { buildQuestions, type GateLike } from "@/lib/challenge";
 import { evaluateCategory, evaluateGeneral } from "@/lib/evaluate";
 import { gateById, publishedCategoryGates, publishedGeneralGates } from "@/lib/rules";
 import type { Answers, GateResult } from "@/lib/types";
+import { applicability } from "@/lib/applicability";
 
 /**
  * POST /api/challenge
@@ -52,10 +53,16 @@ export async function POST(req: Request) {
     .filter((r) => r.outcome === "WEAKNESS" || r.outcome === "MISSING")
     .map((r) => r.gateId);
 
-  const answers: Answers = { ...generalAnswers, ...(categoryAnswers ?? {}) };
+  const answers: Answers = { ...(categoryAnswers ?? {}), ...generalAnswers };
+
+  const inScope = (gateId: string) => {
+    const gate = gateById(gateId);
+    return gate && (gate.scope === "general" || gate.category === categoryId) &&
+      applicability(gate.appliesWhen, gate.scope === "general" ? generalAnswers : categoryAnswers ?? {}) === "APPLIES";
+  };
 
   const questions = buildQuestions(
-    { findings, unclear, passedGateIds, weakOrIncompleteGateIds, answers },
+    { findings: findings.filter((item) => inScope(item.gateId)), unclear: unclear.filter((item) => inScope(item.gateId)), passedGateIds, weakOrIncompleteGateIds, answers },
     toGateLike
   );
 
@@ -76,6 +83,7 @@ function toGateLike(gateId: string): GateLike | undefined {
     options: gate.options,
     plainExplanation: gate.plainExplanation,
     source: gate.source,
+    appliesWhen: gate.appliesWhen,
   };
 }
 

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { AnswerInput } from "./answer-input";
 import type { ChallengeQuestion } from "@/lib/challenge";
-import type { AnswerValue } from "@/lib/types";
+import type { Answers, AnswerValue } from "@/lib/types";
+import { applicability } from "@/lib/applicability";
 
 /*
  * ------------------------------------------------------------
@@ -29,25 +30,41 @@ export type ChallengeOutcome =
   | { type: "ANSWERED"; question: ChallengeQuestion; value: AnswerValue };
 
 type Props = {
+  generalAnswers: Answers;
+  categoryAnswers: Answers;
   questions: ChallengeQuestion[];
   /** Applied as each question is answered, so the verdict moves live. */
-  onOutcome: (outcome: ChallengeOutcome) => void;
+  onOutcome: (outcome: ChallengeOutcome) => Promise<void>;
   onFinish: () => void;
   /** Rendered above the question so a changing verdict is visible in place. */
   verdictBanner?: React.ReactNode;
 };
 
-export default function ChallengePanel({ questions, onOutcome, onFinish, verdictBanner }: Props) {
+export default function ChallengePanel({ generalAnswers, categoryAnswers, questions, onOutcome, onFinish, verdictBanner }: Props) {
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState<AnswerValue>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const question = questions[index];
-  const done = index >= questions.length;
+  const activeIndex = questions.findIndex((candidate, candidateIndex) =>
+    candidateIndex >= index && applicability(candidate.appliesWhen,
+      candidate.scope === "general" ? generalAnswers : categoryAnswers) === "APPLIES"
+  );
+  const question = questions[activeIndex];
+  const done = activeIndex === -1;
 
-  function advance(outcome: ChallengeOutcome) {
-    onOutcome(outcome);
-    setDraft(null);
-    setIndex((i) => i + 1);
+  async function advance(outcome: ChallengeOutcome) {
+    try {
+      setSaving(true);
+      setError(null);
+      await onOutcome(outcome);
+      setDraft(null);
+      setIndex(activeIndex + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save your answer. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (done) {
@@ -60,6 +77,7 @@ export default function ChallengePanel({ questions, onOutcome, onFinish, verdict
           stood by an answer we disagreed with, we have kept your answer and noted the
           disagreement for whoever looks at this next.
         </p>
+        <p className="hint">If a correction introduced a new eligibility question, use Edit answers on your review to complete it.</p>
         <div className="actions">
           <button onClick={onFinish}>See your updated result →</button>
         </div>
@@ -70,7 +88,7 @@ export default function ChallengePanel({ questions, onOutcome, onFinish, verdict
   return (
     <section className="panel">
       <p className="eyebrow">
-        CHECKING YOUR ANSWERS · {index + 1} OF {questions.length}
+        CHECKING YOUR ANSWERS · {activeIndex + 1} OF {questions.length}
       </p>
 
       <h1>{headline(question)}</h1>
@@ -106,7 +124,11 @@ export default function ChallengePanel({ questions, onOutcome, onFinish, verdict
           </div>
         )}
 
-        {renderResponses()}
+        {error && <div className="error" role="alert">{error}</div>}
+        <fieldset disabled={saving} className="challenge-responses">
+          {renderResponses()}
+        </fieldset>
+        {saving && <p role="status">Re-checking your answers...</p>}
 
         <div className="source">
           <strong>Supporting provision</strong>

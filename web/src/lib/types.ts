@@ -49,9 +49,16 @@ export const GateValueSchema = z.union([
   z.string(),
   z.number(),
   z.boolean(),
-  z.array(z.union([z.string(), z.number()])), // for in / notIn
+  z.array(z.union([z.string(), z.number(), z.boolean()])), // for in / notIn
 ]);
 export type GateValue = z.infer<typeof GateValueSchema>;
+
+export const ApplicabilityConditionSchema = z.discriminatedUnion("operator", [
+  z.object({ field: z.string().min(1), operator: z.literal("eq"), value: z.union([z.boolean(), z.string(), z.number()]) }),
+  z.object({ field: z.string().min(1), operator: z.literal("gt"), value: z.number() }),
+  z.object({ field: z.string().min(1), operator: z.literal("lte"), value: z.number() }),
+]);
+export type ApplicabilityCondition = z.infer<typeof ApplicabilityConditionSchema>;
 
 export const OptionSchema = z.object({ value: z.string(), label: z.string() });
 export type Option = z.infer<typeof OptionSchema>;
@@ -131,10 +138,11 @@ const GateFields = {
   exceptions: z.string().optional(),
   source: SourceSchema,
   evidence: EvidenceSchema.optional(), // absent = not yet labelled by legal
+  appliesWhen: z.array(ApplicabilityConditionSchema).min(1).optional(),
+  passExplanation: z.string().min(1).optional(),
 };
 
-const GateBaseSchema = z.object(GateFields);
-type GateShape = z.infer<typeof GateBaseSchema>;
+type GateShape = z.infer<z.ZodObject<typeof GateFields>>;
 
 function refinePublished(gate: GateShape, ctx: z.RefinementCtx) {
   if (gate.status !== "published") return;
@@ -162,7 +170,9 @@ function refinePublished(gate: GateShape, ctx: z.RefinementCtx) {
   if (gate.answerType === "number" && !listOp && typeof gate.value !== "number") {
     issue("value", "number gate needs a numeric value");
   }
-  if (gate.answerType === "boolean" && typeof gate.value !== "boolean") {
+  if (gate.answerType === "boolean" && !(listOp
+    ? Array.isArray(gate.value) && gate.value.every((v) => typeof v === "boolean")
+    : typeof gate.value === "boolean")) {
     issue("value", "boolean gate needs a boolean value");
   }
 }
@@ -285,10 +295,28 @@ export const RulesFileSchema = z
       // but they must agree on how it's asked.
       if (g.field && g.answerType) {
         const key = `${g.scope}:${g.field}`;
-        const sig = g.answerType + "|" + JSON.stringify(g.options ?? null);
+        const sig = g.answerType + "|" + JSON.stringify(g.options ?? null) + "|" + JSON.stringify(g.appliesWhen ?? null);
         const prev = fieldTypes.get(key);
         if (prev && prev !== sig) issue(["gates", g.id], `field "${g.field}" has conflicting answerType/options across gates`);
         fieldTypes.set(key, sig);
+      }
+
+      // Prerequisites must be unconditional published questions in the same
+      // phase. This prevents cycles and hidden, unanswerable dependencies.
+      for (const condition of g.appliesWhen ?? []) {
+        const dependency = all.find((candidate) =>
+          candidate.status === "published" && candidate.field === condition.field &&
+          candidate.scope === g.scope &&
+          (g.scope === "general" || (candidate.scope === "category" && candidate.category === g.category))
+        );
+        if (!dependency || dependency.appliesWhen || dependency.field === g.field || dependency.onFail === "WEAKNESS") {
+          issue(["gates", g.id], `invalid applicability prerequisite "${condition.field}"`);
+        } else {
+          const expectedType = dependency.answerType === "select" || dependency.answerType === "text" ? "string" : dependency.answerType;
+          if (typeof condition.value !== expectedType) {
+            issue(["gates", g.id], `applicability value does not match "${condition.field}"`);
+          }
+        }
       }
 
       // ESCALATE means "don't offer a correction, send it to a human".
@@ -311,6 +339,7 @@ export type Question = {
   answerType: AnswerType;
   options?: Option[];
   gateIds: string[];
+  appliesWhen?: ApplicabilityCondition[];
 };
 
 /* ============================================================
