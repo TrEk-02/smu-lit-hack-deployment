@@ -178,7 +178,7 @@ export const RulesFileSchema = z
   .object({
     version: z.string().optional(),
     categories: z.array(CategorySchema).min(1),
-    generalGates: z.array(GeneralGateSchema),
+    generalGates: z.array(GeneralGateSchema), 
     categoryGates: z.array(CategoryGateSchema),
   })
   .superRefine((file, ctx) => {
