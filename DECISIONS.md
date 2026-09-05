@@ -46,9 +46,6 @@ Every LLM output item should carry a verbatim quote; server checks it appears in
 
 - Document ingestion: text-layer PDFs and pasted text only
 
-**Epic 3 — Claim artifact**
-"Give me an organised way I can act on to put together a claim."
-
 ## 3b. Sprints
 **Sprint 1**: 1.5 hour, building the features for Epic 1
 Tech:
@@ -329,11 +326,138 @@ Two ways to get the verdict-flip demo:
   charge… no price was agreed" contradicts "a price was clearly agreed", and
   confirming it takes the claim PASS → FAIL mid-round.
 
-**Sprint 3**: 1.5 hours, building the features for Epic 3
+**Sprint 3**: Clean-up & polish
 
-## 3c. Clean-up
-1. Polish format 
-2. Build fixture files for Scenario A and Scenario B (demo scenarios)
+**Epic 3 (claim artifact / handoff brief) is abandoned.** Decided 2026-09-06:
+the MVP is stronger polished than broadened. Two consequences to own:
+- §Challenge round says rejected corrections "carry the disagreement into the
+  handoff brief". With no brief, **"Where we still disagree" on the review page
+  becomes the terminal artifact** — it has to stand on its own, not read as a
+  stub for something later.
+- The challenge statement's *Escalation* requirement asks each build to produce
+  "a handoff brief… the issue, the relevant documents and clauses, what the tool
+  already established, and the specific question that needs human judgement".
+  Our disagreements + escalated findings already contain all four. Reframing that
+  one section as the handoff (rather than building Epic 3) is ~20 min and keeps
+  the requirement answered. **Recommended; not yet decided.**
+
+Ordered by priority. F1 is the only one that is currently breaking the demo.
+
+---
+
+### F1. Ship the OpenRouter key to Vercel  ⚠️ demo-breaking 
+
+The deployed app has no `OPENROUTER_API_KEY` — `.env` is gitignored and never
+left the laptop — so `isStubbed()` is true and **every deployed run serves the
+demo fixture**. This is the root cause of the "[demo fixture]" confusion, and
+almost certainly of "only one contradiction per document" and "the questions
+seem arbitrary" as well (the stub emits exactly one finding and hard-picks
+`briefs[0]`/`briefs[1]` with no ranking at all).
+
+- Set as a plain server-side var (never `NEXT_PUBLIC_`), Production **and**
+  Preview, then redeploy — Vercel only reads env changes on a new build.
+- Set a spend cap at OpenRouter: Preview URLs are public, and $15 is drainable.
+- Re-test 4 and 7 against the live model before designing around them.
+
+### F2. Fix legal's broken question wording  ⚠️ visibly wrong on screen
+
+Four gates pair an open "what/how" question with a yes-no or "Yes — …" input
+(`boc_subject_matter`, `boc_delivery_date`, `boc_quantity`,
+`boc_claimant_preconditions`), and **`boc_price_agreed` is polarity-inverted** —
+"Were there *any changes* to the price?" still PASSes on `true`. Legal fixes the
+wording or the answer type; dev does not guess. Also still open:
+`boc_payment_due`'s evidence block is dev-authored and needs legal sign-off.
+
+### F3. Challenge round — make the point visible
+
+The ranking is a documented five-tier order, but the user never sees it, so it
+reads as arbitrary. Two changes, both cheap, both aimed at "what is the point if
+they can just double down":
+
+- **Say why we're asking**, per question: *"because your document appears to
+  disagree with what you told us"* vs *"because you left this blank"*.
+- **Stop mixing two products.** Contradictions and missing-answer follow-ups
+  currently arrive looking identical, which dilutes both. Split the round:
+  *"2 things don't match what you told us"* then *"3 things we still need"*.
+- Same split on the evidence page: contradictions expanded, corroborations
+  collapsed under "N things your document backs up".
+- Stress-test the user journey end to end, including a claimant who rejects
+  everything — the round must still terminate and still produce a usable
+  disagreement record.
+
+### F4. Demo fixtures — Scenario A and Scenario B (Ding Jie)
+
+- Live in **`src/config/scenarios.json`, not `rules.json`** — rules.json is
+  validated at import and throws, so a typo in demo data would take down the
+  whole app.
+- Auto-fill button at the foot of the category page, filling general + category
+  + party **inputs only**. Verdict and LLM findings still compute live: if a
+  judge suspects canned findings, the pitch is over.
+- Legal authors **dummy documents** per scenario for the LLM to ingest,
+  separately from the answer fixtures.
+- One test per scenario asserting its expected verdict, so a rules.json edit
+  can't silently kill the demo overnight.
+- Scenario B must turn on `boc_consideration` or `boc_proof_of_agreement` — the
+  only published gates that are both checkable and FAIL-severity. The
+  `claimAmount` lever does **not** work (see F5).
+
+### F5. General eligibility gates — five additions (Ding Jie)
+
+All fit the existing schema; no new gate types. Legal authors, dev publishes.
+
+| Gate | Severity | Note |
+|---|---|---|
+| Claim $20k–$30k needs both parties' written consent | CONDITIONAL | **Already drafted** as `gen_claim_amount_consent` — publish, don't build |
+| Claimant is 18+, or has a litigation representative | CONDITIONAL | Ask as a boolean — avoids adding a `date` answerType |
+| Respondent is in Singapore | FAIL | legal to confirm |
+| Respondent is bankrupt | CONDITIONAL | Decided 2026-09-06. Note the semantic stretch: CONDITIONAL means "proceed if a condition is met", but bankruptcy means "you may file and it will likely be pointless". Accepted as the closest fit rather than adding a severity |
+| Existing/concurrent proceedings on the same claim elsewhere | FAIL | legal to confirm |
+
+Watch the side effect: 2 gates → 7 gates means more ways to land INCOMPLETE,
+since any unanswered FAIL/CONDITIONAL gate blocks. Decide per gate whether it
+truly blocks.
+
+**Also add `evidence` blocks to the general gates.** They are all
+`checkable: false` by omission today, so no document is ever checked against
+them — which is why a document showing a figure over S$30,000 cannot flip the
+verdict.
+
+### F6. Review page — readable labels and colour (Ding Jie)
+
+- `GateResult` carries `question` from the server. The client has no rules
+  access, so any client-side gateId→question map is a second source of truth.
+- Colour per outcome, **per gate only — never aggregated into a score.** Six
+  ambers must not start reading as "60% likely to lose"; that is outcome
+  prediction, which §8 forbids.
+
+| Outcome | Colour | Reads as |
+|---|---|---|
+| PASS | green | clear |
+| CONDITIONAL | amber | can proceed if a condition is met |
+| WEAKNESS | amber-neutral | this part is thin |
+| MISSING | grey | not answered — explicitly **not** a mark against you |
+| FAIL | red | hard stop |
+
+Colour never carries meaning alone — every state keeps its text label.
+
+### F7. Multiple documents — up to five
+
+- UI states the limit explicitly ("up to 5 files").
+- `docId` flows through the finding and the quote verifier, which currently
+  takes a flat page list. Already anticipated in §Challenge round ("quote,
+  docId, page").
+- Cap the **bundle**, not the file: `MAX_CHARS` is 200k per document today, so
+  five documents is 1M characters of prompt.
+
+### F8. Cleanup
+
+- Delete `src/lib/mock-verdict.ts` — dead code, nothing imports it.
+- Drop the inline `[demo fixture]` prefix from stub observations; keep the
+  banner. Two signals reads as noise.
+- Distinguish **"never configured"** (a setup error — say so before the user
+  uploads anything) from **"the call failed"** (stub and label it, per §8).
+- Stale READMEs in `api/evaluate/` and `config/` describe field names that no
+  longer exist.
 
 ## 4. Scope + cut-line
 IN (MVP, in priority order):
