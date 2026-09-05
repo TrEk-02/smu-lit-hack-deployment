@@ -401,6 +401,16 @@ they can just double down":
   only published gates that are both checkable and FAIL-severity. The
   `claimAmount` lever does **not** work (see F5).
 
+**Fixture shortcuts implemented 2026-09-06:** `src/config/scenarios.json`
+holds editable Scenario A and Scenario B answer data transcribed from Book1.xlsx.
+The buttons at the bottom of the breach-of-contract category form populate
+general, category and party answers only; the normal "Check eligibility" action
+still calculates the verdict. F5 fields absent from the spreadsheet are explicit
+demo assumptions: adult claimant, Singapore respondent, not bankrupt/insolvent,
+and no existing proceedings. Both scenarios initially pass current rules,
+enforced by `src/lib/scenarios.test.ts`. Scenario B's separate document-driven
+PASS-to-FAIL demonstration remains to be finalised with legal.
+
 ### F5. General eligibility gates — five additions (Ding Jie)
 
 All fit the existing schema; no new gate types. Legal authors, dev publishes.

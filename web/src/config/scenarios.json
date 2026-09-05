@@ -1,0 +1,76 @@
+[
+  {
+    "id": "scenario-a",
+    "label": "Load Scenario A",
+    "categoryId": "BREACH_OF_CONTRACT",
+    "generalAnswers": {
+      "claimAmount": 3000,
+      "withinTwoYears": true,
+      "claimantIs18OrOlder": true,
+      "respondentInSingapore": true,
+      "respondentBankruptOrInsolvent": false,
+      "hasExistingCourtProceedings": false
+    },
+    "categoryAnswers": {
+      "proofOfAgreement": "written",
+      "subjectMatterIdentifiable": true,
+      "considerationAgreed": true,
+      "deliveryDateAgreed": "exact",
+      "qualityShortfall": "express_breach",
+      "quantityAgreed": "agreed_and_short",
+      "originalPriceClear": true,
+      "paymentEvidence": true,
+      "paymentDueAgreed": true,
+      "claimantPreconditions": "fulfilled",
+      "noticeGiven": "prompt",
+      "mitigationStepsTaken": true,
+      "defectTiming": "later",
+      "remedyRequested": true,
+      "liabilityExclusionPresent": false
+    },
+    "partyAnswers": {
+      "filingAs": "entity",
+      "entityType": "sole_proprietorship",
+      "entityRole": "Owner",
+      "respondentType": "corporate",
+      "respondentNames": "XYZ Marketing Pte Ltd"
+    }
+  },
+  {
+    "id": "scenario-b",
+    "label": "Load Scenario B",
+    "categoryId": "BREACH_OF_CONTRACT",
+    "generalAnswers": {
+      "claimAmount": 1500,
+      "withinTwoYears": true,
+      "claimantIs18OrOlder": true,
+      "respondentInSingapore": true,
+      "respondentBankruptOrInsolvent": false,
+      "hasExistingCourtProceedings": false
+    },
+    "categoryAnswers": {
+      "proofOfAgreement": "written",
+      "subjectMatterIdentifiable": true,
+      "considerationAgreed": true,
+      "deliveryDateAgreed": "exact",
+      "qualityShortfall": "express_breach",
+      "quantityAgreed": "agreed_and_short",
+      "originalPriceClear": true,
+      "paymentEvidence": true,
+      "paymentDueAgreed": true,
+      "claimantPreconditions": "fulfilled",
+      "noticeGiven": "prompt",
+      "mitigationStepsTaken": true,
+      "defectTiming": "later",
+      "remedyRequested": true,
+      "liabilityExclusionPresent": false
+    },
+    "partyAnswers": {
+      "filingAs": "entity",
+      "entityType": "sole_proprietorship",
+      "entityRole": "Owner",
+      "respondentType": "corporate",
+      "respondentNames": "XYZ Marketing Pte Ltd"
+    }
+  }
+]

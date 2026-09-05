@@ -40,6 +40,9 @@ footer { padding: 28px 0; color: #617184; font-size: 13px; }
 dt { font-weight: 700; font-size: 14px; }dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .summary > div { display: grid; grid-template-columns: 165px minmax(0, 1fr); gap: 15px; border-bottom: 1px solid #e1e7ee; padding: 15px 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.demo-scenarios { margin-top: 20px; padding-top: 18px; border-top: 1px solid #e1e7ee; }
+.demo-scenarios .hint { margin: 0; }
+.demo-scenarios .actions { margin-top: 12px; }
 .error { background: #fdecec; border-left: 4px solid #b3261e; padding: 13px 18px; margin: 18px 0; font-size: 14px; }
 .warning { background: #fff5e0; border-left: 4px solid #a9700d; padding: 13px 18px; margin: 18px 0; font-size: 14px; }
 .status-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e1e7ee; }

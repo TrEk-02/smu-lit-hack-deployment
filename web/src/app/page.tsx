@@ -14,6 +14,7 @@ import type { Provenance } from "@/lib/llm/provenance";
 import { computeFilingFee } from "@/lib/filing-fee";
 import { applicability } from "@/lib/applicability";
 import { reviewStatus } from "@/lib/review-status";
+import { demoScenarios, type DemoScenario } from "@/lib/scenarios";
 import type {
   AnswerValue,
   Answers,
@@ -328,6 +329,19 @@ export default function Home() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Demo convenience only; the existing evaluator still produces the verdict. */
+  function loadDemoScenario(scenario: DemoScenario) {
+    setAnswers(scenario.generalAnswers);
+    setCategoryAnswers(scenario.categoryAnswers);
+    setPartyAnswers(scenario.partyAnswers);
+    setVerdict(null);
+    setEvidenceResult(null);
+    setChallengeQuestions([]);
+    setDisagreements([]);
+    setVerdictChanged(false);
+    setError(null);
   }
 
   /*
@@ -810,6 +824,26 @@ export default function Home() {
                   ? "Checking..."
                   : "Check eligibility →"}
               </button>
+
+              {demoScenarios.filter((scenario) => scenario.categoryId === selectedCategory).length > 0 && (
+                <div className="demo-scenarios">
+                  <p className="hint">Demo shortcuts: fill a scenario, then check eligibility.</p>
+                  <div className="actions">
+                    {demoScenarios
+                      .filter((scenario) => scenario.categoryId === selectedCategory)
+                      .map((scenario) => (
+                        <button
+                          key={scenario.id}
+                          type="button"
+                          className="secondary"
+                          onClick={() => loadDemoScenario(scenario)}
+                        >
+                          {scenario.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </form>
           )}
 
