@@ -249,7 +249,6 @@ render question (+ quote, docId, page where a document drove it)
 → re-run evaluate()
 → verdict + provenance badges re-render
 
-
 **Non-negotiables**:
 - The user always has the last word on facts about their own life. Reject is
   always available and always ends that question.
