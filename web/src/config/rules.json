@@ -467,5 +467,65 @@
       "exceptions": "Indemnity clauses are rare in simple consumer transactions.",
       "source": { "title": "General contract law", "provision": "Indemnity as a distinct contractual remedy from damages", "url": "" }
     }
+  ],
+
+  "partyFields": [
+    {
+      "id": "party_filing_as",
+      "status": "published",
+      "field": "filingAs",
+      "question": "Are you an individual filing a claim for yourself, or filing on behalf of an entity?",
+      "answerType": "select",
+      "options": [
+        { "value": "individual", "label": "Individual" },
+        { "value": "entity", "label": "On behalf of an entity" }
+      ]
+    },
+    {
+      "id": "party_entity_type",
+      "status": "published",
+      "field": "entityType",
+      "question": "What type of entity are you filing this claim for? (For some entities, an ACRA Bizfile certificate may be needed to verify status.)",
+      "answerType": "select",
+      "options": [
+        { "value": "sole_proprietorship", "label": "Sole Proprietorship" },
+        { "value": "partnership", "label": "Partnership" },
+        { "value": "unincorporated_association", "label": "Unincorporated association" },
+        { "value": "llp", "label": "Limited liability partnership" },
+        { "value": "company", "label": "Company" },
+        { "value": "management_corporation", "label": "Management Corporation" },
+        { "value": "town_council", "label": "Town Council" },
+        { "value": "csbf_council", "label": "Council of Singapore Business Federation" },
+        { "value": "public_service_officer", "label": "Public Service Officer" }
+      ],
+      "dependsOn": { "field": "filingAs", "value": "entity" }
+    },
+    {
+      "id": "party_entity_role",
+      "status": "published",
+      "field": "entityRole",
+      "question": "What is your current role in the entity?",
+      "answerType": "text",
+      "dependsOn": { "field": "filingAs", "value": "entity" }
+    },
+    {
+      "id": "party_respondent_type",
+      "status": "published",
+      "field": "respondentType",
+      "question": "Are you filing against an individual, a corporate entity, or both?",
+      "answerType": "select",
+      "options": [
+        { "value": "individual", "label": "Individual(s)" },
+        { "value": "corporate", "label": "Corporate Entities" },
+        { "value": "both", "label": "Both individual and corporate entities" }
+      ]
+    },
+    {
+      "id": "party_respondent_names",
+      "status": "published",
+      "field": "respondentNames",
+      "question": "Please list the names of the individuals or corporate entities you intend to claim against.",
+      "answerType": "text"
+    }
   ]
 }

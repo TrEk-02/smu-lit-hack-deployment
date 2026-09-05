@@ -22,7 +22,7 @@ export const LifecycleStatusSchema = z.enum(["draft", "published"]);
 export type LifecycleStatus = z.infer<typeof LifecycleStatusSchema>;
 
 // What kind of input the UI renders for a gate's field.
-export const AnswerTypeSchema = z.enum(["boolean", "number", "select"]);
+export const AnswerTypeSchema = z.enum(["boolean", "number", "select", "text"]);
 export type AnswerType = z.infer<typeof AnswerTypeSchema>;
 
 // Comparison applied as: answers[field] <operator> value
@@ -171,6 +171,41 @@ export const CategorySchema = z.object({
 export type Category = z.infer<typeof CategorySchema>;
 
 /* ============================================================
+ * PARTY FIELD — plain intake fields (who is filing, who they're
+ * filing against). Deliberately not a Gate: these have no
+ * operator/onFail/source/plainExplanation because they aren't
+ * eligibility checks, just data capture into answers{} (Sprint 2,
+ * DECISIONS.md "Party & filing details").
+ * ============================================================ */
+
+export const DependsOnSchema = z.object({
+  field: z.string().min(1),
+  value: AnswerValueSchema,
+});
+export type DependsOn = z.infer<typeof DependsOnSchema>;
+
+export const PartyFieldSchema = z.object({
+  id: z.string().min(1),
+  status: LifecycleStatusSchema,
+  field: z.string().min(1),
+  question: z.string().min(1),
+  answerType: AnswerTypeSchema,
+  options: z.array(OptionSchema).optional(),
+  dependsOn: DependsOnSchema.optional(),
+});
+export type PartyField = z.infer<typeof PartyFieldSchema>;
+
+// What the UI renders for a party field — parallel to Question,
+// but there's no gateIds since these don't back an evaluated gate.
+export type PartyQuestion = {
+  field: string;
+  question: string;
+  answerType: AnswerType;
+  options?: Option[];
+  dependsOn?: DependsOn;
+};
+
+/* ============================================================
  * RULES FILE — the whole of config/rules.json
  * ============================================================ */
 
@@ -178,8 +213,9 @@ export const RulesFileSchema = z
   .object({
     version: z.string().optional(),
     categories: z.array(CategorySchema).min(1),
-    generalGates: z.array(GeneralGateSchema), 
+    generalGates: z.array(GeneralGateSchema),
     categoryGates: z.array(CategoryGateSchema),
+    partyFields: z.array(PartyFieldSchema).default([]),
   })
   .superRefine((file, ctx) => {
     const issue = (path: string[], message: string) =>
@@ -188,6 +224,11 @@ export const RulesFileSchema = z
     const catIds = new Set(file.categories.map((c) => c.id));
     const seenIds = new Set<string>();
     const fieldTypes = new Map<string, string>();
+
+    file.partyFields.forEach((f) => {
+      if (seenIds.has(f.id)) issue(["partyFields", f.id], `duplicate id "${f.id}"`);
+      seenIds.add(f.id);
+    });
 
     const all: Gate[] = [...file.generalGates, ...file.categoryGates];
     all.forEach((g) => {

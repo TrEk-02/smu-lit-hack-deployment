@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generalQuestions, publishedGeneralGates, rules, supportedCategories } from "@/lib/rules";
+import { generalQuestions, partyQuestions, publishedGeneralGates, rules, supportedCategories } from "@/lib/rules";
 import type { ConfigResponse } from "@/lib/api";
 
 /**
@@ -17,6 +17,7 @@ export function GET() {
     ready: publishedGeneralGates.length > 0,
     categories: supportedCategories(),
     generalQuestions,
+    partyQuestions: partyQuestions(),
   };
 
   return NextResponse.json(body, {

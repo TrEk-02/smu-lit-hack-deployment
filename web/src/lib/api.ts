@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AnswersSchema, CategorySchema, GateResultSchema, PhaseStatusSchema } from "./types";
-import type { Question } from "./types";
+import type { PartyQuestion, Question } from "./types";
 
 /* ============================================================
  * GET /api/config  →  ConfigResponse
@@ -12,6 +12,7 @@ export type ConfigResponse = {
   ready: boolean;              // false when a phase has no published gates yet
   categories: Category[];      // only categories with published gates
   generalQuestions: Question[];
+  partyQuestions: PartyQuestion[];
 };
 
 // GET /api/config/[categoryId] → CategoryConfigResponse

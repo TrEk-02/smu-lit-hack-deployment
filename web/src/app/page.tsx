@@ -2,10 +2,12 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { EvaluateResponse } from "@/lib/api";
+import { computeFilingFee } from "@/lib/filing-fee";
 import type {
   AnswerType,
   Answers,
   Category,
+  PartyQuestion,
   Question,
 } from "@/lib/types";
 
@@ -14,6 +16,7 @@ type ConfigResponse = {
   ready: boolean;
   categories: Category[];
   generalQuestions: Question[];
+  partyQuestions: PartyQuestion[];
 };
 
 type CategoryConfigResponse = {
@@ -21,7 +24,7 @@ type CategoryConfigResponse = {
   questions: Question[];
 };
 
-type Step = "general" | "category" | "review";
+type Step = "general" | "category" | "party" | "review";
 
 export default function Home() {
   const [step, setStep] = useState<Step>("general");
@@ -32,6 +35,7 @@ export default function Home() {
 
   const [answers, setAnswers] = useState<Answers>({});
   const [categoryAnswers, setCategoryAnswers] = useState<Answers>({});
+  const [partyAnswers, setPartyAnswers] = useState<Answers>({});
 
   const [selectedCategory, setSelectedCategory] = useState("");
 
@@ -94,6 +98,12 @@ export default function Home() {
   }
 
   /*
+   * Shared shape for anything renderQuestion/renderInput can draw —
+   * both eligibility Questions and party-field PartyQuestions.
+   */
+  type FormQuestion = Pick<Question, "field" | "question" | "answerType" | "options">;
+
+  /*
    * Convert HTML input values into the type expected by the
    * backend.
    *
@@ -103,7 +113,7 @@ export default function Home() {
 
   function handleInputChange(
     setter: React.Dispatch<React.SetStateAction<Answers>>,
-    question: Question,
+    question: FormQuestion,
     rawValue: string
   ) {
     if (rawValue === "") {
@@ -133,7 +143,7 @@ export default function Home() {
    */
 
   function renderQuestion(
-    question: Question,
+    question: FormQuestion,
     currentAnswers: Answers,
     setter: React.Dispatch<React.SetStateAction<Answers>>
   ) {
@@ -151,11 +161,27 @@ export default function Home() {
   }
 
   function renderInput(
-    question: Question,
+    question: FormQuestion,
     value: Answers[string],
     setter: React.Dispatch<React.SetStateAction<Answers>>
   ) {
     switch (question.answerType as AnswerType) {
+      case "text":
+        return (
+          <textarea
+            id={question.field}
+            value={typeof value === "string" ? value : ""}
+            rows={2}
+            onChange={(event) =>
+              handleInputChange(
+                setter,
+                question,
+                event.target.value
+              )
+            }
+          />
+        );
+
       case "number":
         return (
           <input
@@ -396,7 +422,15 @@ export default function Home() {
 
       setVerdict(result);
 
-      setStep("review");
+      /*
+       * Only move on to party & filing details once the category
+       * phase has actually cleared — DECISIONS.md's Sprint 2 feature
+       * is gated on "if Sprint 1 form passes". If it's still
+       * incomplete, stay here so the claimant can fix their answers.
+       */
+      if (result.nextStep === "COMPLETE") {
+        setStep("party");
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -410,6 +444,27 @@ export default function Home() {
 
   /*
    * ------------------------------------------------------------
+   * Party & filing details (Sprint 2) — pure data capture, no
+   * eligibility gates. Recorded directly into partyAnswers and
+   * shown on review; never sent to /api/evaluate.
+   * ------------------------------------------------------------
+   */
+
+  function partyFieldVisible(question: PartyQuestion): boolean {
+    if (!question.dependsOn) return true;
+    return partyAnswers[question.dependsOn.field] === question.dependsOn.value;
+  }
+
+  const filingAs = partyAnswers.filingAs;
+  const claimAmount = answers.claimAmount;
+  const filingFee =
+    typeof claimAmount === "number" &&
+    (filingAs === "individual" || filingAs === "entity")
+      ? computeFilingFee(claimAmount, filingAs)
+      : null;
+
+  /*
+   * ------------------------------------------------------------
    * Reset
    * ------------------------------------------------------------
    */
@@ -418,6 +473,7 @@ export default function Home() {
     setStep("general");
     setAnswers({});
     setCategoryAnswers({});
+    setPartyAnswers({});
     setSelectedCategory("");
     setCategoryConfig(null);
     setVerdict(null);
@@ -476,7 +532,9 @@ export default function Home() {
 
         <nav className="steps">
           <span>01 Claim details</span>
-          <span className="active">02 Review</span>
+          <span>02 Claim category</span>
+          <span>03 Party & filing</span>
+          <span className="active">04 Review</span>
         </nav>
 
         <section className="panel">
@@ -520,13 +578,20 @@ export default function Home() {
             />
           )}
 
+          <PartyDetailsSummary
+            partyQuestions={config?.partyQuestions ?? []}
+            partyAnswers={partyAnswers}
+            claimAmount={claimAmount}
+            filingFee={filingFee}
+          />
+
           <div className="actions">
             <button
               className="secondary"
               onClick={() => {
                 setStep(
                   verdict.category
-                    ? "category"
+                    ? "party"
                     : "general"
                 );
               }}
@@ -569,7 +634,8 @@ export default function Home() {
           <span className="active">
             02 Claim category
           </span>
-          <span>03 Review</span>
+          <span>03 Party & filing</span>
+          <span>04 Review</span>
         </nav>
 
         <section className="panel">
@@ -657,6 +723,81 @@ export default function Home() {
 
   /*
    * ------------------------------------------------------------
+   * PARTY & FILING DETAILS STEP (Sprint 2)
+   * Pure data capture — no eligibility gates, no /api/evaluate call.
+   * ------------------------------------------------------------
+   */
+
+  if (step === "party") {
+    const claimAmountQuestion = config?.generalQuestions.find(
+      (q) => q.field === "claimAmount"
+    );
+
+    return (
+      <main className="shell">
+        <header className="brand">
+          <strong>Claim guide</strong>
+          <span>Hackathon prototype</span>
+        </header>
+
+        <nav className="steps">
+          <span>01 General details</span>
+          <span>02 Claim category</span>
+          <span className="active">03 Party & filing</span>
+          <span>04 Review</span>
+        </nav>
+
+        <section className="panel">
+          <p className="eyebrow">
+            PARTY & FILING DETAILS · NEXT STEP
+          </p>
+
+          <h1>Tell us who is involved</h1>
+
+          <p className="intro">
+            This records who is filing and who the claim is against.
+            It does not affect your eligibility result.
+          </p>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setStep("review");
+            }}
+          >
+            {(config?.partyQuestions ?? [])
+              .filter(partyFieldVisible)
+              .map((question) =>
+                renderQuestion(question, partyAnswers, setPartyAnswers)
+              )}
+
+            {claimAmountQuestion &&
+              renderQuestion(claimAmountQuestion, answers, setAnswers)}
+
+            <div className="field">
+              <label>Filing / processing fee</label>
+              <p>
+                {filingFee !== null
+                  ? `S$${filingFee.toFixed(2)}`
+                  : "— confirm your claim amount and filing type above"}
+              </p>
+            </div>
+
+            <button type="submit" disabled={filingFee === null}>
+              Continue to review →
+            </button>
+          </form>
+        </section>
+
+        <footer>
+          Independent student prototype · Not an official court service
+        </footer>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
    * GENERAL STEP
    * ------------------------------------------------------------
    */
@@ -673,7 +814,8 @@ export default function Home() {
           01 Claim details
         </span>
         <span>02 Claim category</span>
-        <span>03 Review</span>
+        <span>03 Party & filing</span>
+        <span>04 Review</span>
       </nav>
 
       <div className="content-grid">
@@ -787,6 +929,96 @@ export default function Home() {
         Independent student prototype · Not an official court service
       </footer>
     </main>
+  );
+}
+
+/*
+ * ------------------------------------------------------------
+ * Party & filing details summary (Sprint 2)
+ * ------------------------------------------------------------
+ */
+
+function PartyDetailsSummary({
+  partyQuestions,
+  partyAnswers,
+  claimAmount,
+  filingFee,
+}: {
+  partyQuestions: PartyQuestion[];
+  partyAnswers: Answers;
+  claimAmount: Answers[string];
+  filingFee: number | null;
+}) {
+  const filingAs = partyAnswers.filingAs;
+
+  function optionLabel(field: string, value: Answers[string]): string {
+    if (typeof value !== "string" || !value) return "Not provided";
+    const question = partyQuestions.find((q) => q.field === field);
+    return (
+      question?.options?.find((option) => option.value === value)?.label ??
+      value
+    );
+  }
+
+  return (
+    <section className="results">
+      <h2>Party & filing details</h2>
+
+      <div className="status-row">
+        <strong>Filing as</strong>
+        <span>{optionLabel("filingAs", filingAs)}</span>
+      </div>
+
+      {filingAs === "entity" && (
+        <>
+          <div className="status-row">
+            <strong>Entity type</strong>
+            <span>{optionLabel("entityType", partyAnswers.entityType)}</span>
+          </div>
+
+          <div className="status-row">
+            <strong>Your role</strong>
+            <span>
+              {typeof partyAnswers.entityRole === "string" &&
+              partyAnswers.entityRole
+                ? partyAnswers.entityRole
+                : "Not provided"}
+            </span>
+          </div>
+        </>
+      )}
+
+      <div className="status-row">
+        <strong>Filing against</strong>
+        <span>{optionLabel("respondentType", partyAnswers.respondentType)}</span>
+      </div>
+
+      <div className="status-row">
+        <strong>Respondent name(s)</strong>
+        <span>
+          {typeof partyAnswers.respondentNames === "string" &&
+          partyAnswers.respondentNames
+            ? partyAnswers.respondentNames
+            : "Not provided"}
+        </span>
+      </div>
+
+      <div className="status-row">
+        <strong>Claim amount</strong>
+        <span>
+          {typeof claimAmount === "number"
+            ? `S$${claimAmount.toFixed(2)}`
+            : "Not provided"}
+        </span>
+      </div>
+
+      <div className="status-row">
+        <strong>Filing / processing fee</strong>
+        <span>
+          {filingFee !== null ? `S$${filingFee.toFixed(2)}` : "Not computed"}
+        </span>
+      </div>
+    </section>
   );
 }
 

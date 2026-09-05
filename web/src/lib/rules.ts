@@ -6,6 +6,8 @@ import {
   type CategoryGate,
   type Gate,
   type GeneralGate,
+  type PartyField,
+  type PartyQuestion,
   type Question,
   type RulesFile,
 } from "./types";
@@ -61,4 +63,18 @@ export function toQuestions(gates: Gate[]): Question[] {
 export const generalQuestions: Question[] = toQuestions(publishedGeneralGates);
 export function categoryQuestions(categoryId: string): Question[] {
   return toQuestions(publishedCategoryGates(categoryId));
+}
+
+/** Party & filing intake fields ready to show (Sprint 2). */
+export const publishedPartyFields: PartyField[] = rules.partyFields.filter((f) => f.status === "published");
+
+/** Turns published party fields into what the UI renders. */
+export function partyQuestions(): PartyQuestion[] {
+  return publishedPartyFields.map((f) => ({
+    field: f.field,
+    question: f.question,
+    answerType: f.answerType,
+    options: f.options,
+    dependsOn: f.dependsOn,
+  }));
 }

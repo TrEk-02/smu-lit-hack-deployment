@@ -26,6 +26,7 @@ function typeMatches(raw: AnswerValue, answerType: AnswerType): boolean {
     case "boolean": return typeof raw === "boolean";
     case "number":  return typeof raw === "number" && Number.isFinite(raw);
     case "select":  return typeof raw === "string";
+    case "text":    return typeof raw === "string";
   }
 }
 
