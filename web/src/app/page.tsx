@@ -1029,7 +1029,7 @@ export default function Home() {
                       className="follow-up"
                     >
                       <strong>
-                        {result.field}
+                        {result.question}
                       </strong>
 
                       <p>
@@ -1285,12 +1285,14 @@ function ResultPhase({
 
       {phase.results.map((result) => (
         <article
-          className="gate-result"
+          className={`gate-result gate-result--${result.outcome.toLowerCase()}`}
           key={result.gateId}
         >
           <div className="gate-header">
-            <strong>{result.field}</strong>
-            <span>{result.outcome}</span>
+            <strong>{result.question}</strong>
+            <span className={`outcome outcome--${result.outcome.toLowerCase()}`}>
+              {result.outcome}
+            </span>
           </div>
 
           <p>{result.explanation}</p>

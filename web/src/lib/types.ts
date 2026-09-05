@@ -349,6 +349,8 @@ export type Question = {
 export const GateResultSchema = z.object({
   gateId: z.string(),
   field: z.string(),
+  /** The authored claimant-facing question; never make the UI render a field key. */
+  question: z.string(),
   outcome: GateOutcomeSchema,
   severity: SeveritySchema, // what this gate's failure would mean
   explanation: z.string(),

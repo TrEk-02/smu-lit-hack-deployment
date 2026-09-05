@@ -49,6 +49,7 @@ function evaluateGate(gate: PublishedGate, answers: Answers): GateResult {
   const base = {
     gateId: gate.id,
     field: gate.field,
+    question: gate.question,
     severity: gate.onFail,
     exceptions: gate.exceptions,
     source: gate.source,

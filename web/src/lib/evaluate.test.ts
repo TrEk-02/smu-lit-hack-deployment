@@ -23,6 +23,10 @@ const representation = rules.generalGates.find((gate) => gate.id === "gen_minor_
 test("adult baseline passes and hidden follow-ups are not assessed", () => {
   const verdict = assess({ memorandumSigned: false, hasParentOrGuardianRepresentation: false });
   assert.equal(verdict.status, "PASS");
+  assert.equal(
+    verdict.results.find((result) => result.gateId === "gen_claim_amount_max")?.question,
+    "How much are you claiming, in Singapore dollars?"
+  );
   assert.ok(!verdict.results.some((r) => r.gateId === consent.id || r.gateId === representation.id));
 });
 

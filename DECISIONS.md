@@ -492,6 +492,13 @@ Evidence API validation used the labelled stub, not a paid live model call.
 
 Colour never carries meaning alone — every state keeps its text label.
 
+**Implemented 2026-09-06:** `GateResult` now carries the rule-authored
+`question`, and the review cards and "More information needed" display it rather
+than internal answer keys such as `claimAmount` or `respondentInSingapore`.
+Per-gate outcome colours use the agreed PASS/CONDITIONAL/WEAKNESS/MISSING/FAIL
+palette with an explicit text label. Form submit controls and field-local
+actions receive spacing from the preceding input.
+
 ### F7. Multiple documents — up to five
 
 - UI states the limit explicitly ("up to 5 files").

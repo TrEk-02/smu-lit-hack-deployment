@@ -27,6 +27,9 @@ textarea { resize: vertical; }::placeholder { color: #677588; opacity: 1; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.row > div { min-width: 0; }
 button { background: #153a59; color: white; border: 1px solid #153a59; border-radius: 6px; padding: 12px 22px; font-weight: 700; cursor: pointer; min-height: 46px; }
 button:hover { background: #245779; }
+form > button[type="submit"] { margin-top: 28px; }
+.field > button { margin-top: 12px; }
+.results > button { margin-top: 10px; }
 aside { padding: 25px 2px; }aside p:not(.eyebrow) { color: #536477; font-size: 14px; }
 hr { border: 0; border-top: 1px solid #d6dfe9; margin: 26px 0; }
 footer { padding: 28px 0; color: #617184; font-size: 13px; }
@@ -41,8 +44,19 @@ dt { font-weight: 700; font-size: 14px; }dd { margin: 0; overflow-wrap: anywhere
 .warning { background: #fff5e0; border-left: 4px solid #a9700d; padding: 13px 18px; margin: 18px 0; font-size: 14px; }
 .status-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e1e7ee; }
 .gate-result { border: 1px solid #dce3ec; border-radius: 10px; padding: 20px; margin: 16px 0; background: white; }
+.gate-result--pass { border-left: 4px solid #237a4b; }
+.gate-result--conditional { border-left: 4px solid #a9700d; }
+.gate-result--weakness { border-left: 4px solid #9a7a38; }
+.gate-result--missing { border-left: 4px solid #788596; }
+.gate-result--fail { border-left: 4px solid #b3261e; }
 .gate-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 10px; }
 .gate-header strong { font-size: 15px; }
+.outcome { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.outcome--pass { color: #17663d; }
+.outcome--conditional { color: #8a5d08; }
+.outcome--weakness { color: #6e5728; }
+.outcome--missing { color: #536477; }
+.outcome--fail { color: #a51f18; }
 .badge-contradicts { color: #7a1d16; background: #fdd9d5; }
 .badge-corroborates { color: #14532d; background: #d6f0dd; }
 .quote { margin: 14px 0; padding: 13px 18px; background: #f1f6fa; border-left: 4px solid #45708e; font-style: italic; }
