@@ -345,7 +345,7 @@ Ordered by priority. F1 is the only one that is currently breaking the demo.
 
 ---
 
-### F1. Ship the OpenRouter key to Vercel  ⚠️ demo-breaking 
+### F1. Ship the OpenRouter key to Vercel  ⚠️ demo-breaking (COMPLETE)
 
 The deployed app has no `OPENROUTER_API_KEY` — `.env` is gitignored and never
 left the laptop — so `isStubbed()` is true and **every deployed run serves the
