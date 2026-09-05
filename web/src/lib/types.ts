@@ -64,6 +64,47 @@ export const SourceSchema = z.object({
 export type Source = z.infer<typeof SourceSchema>;
 
 /* ============================================================
+ * EVIDENCE — what a document would have to show for this gate.
+ * A discriminated union on `checkable`, so a gate cannot be
+ * half-filled: either it says what to look for, or it says why
+ * no document could speak to it.
+ *
+ * `expect` is the field that drives finding quality — it is the
+ * only gate content the model ever sees besides the question and
+ * the claimant's own answer. `source` and `plainExplanation` are
+ * never sent; they are joined back in by gateId afterwards.
+ *
+ * `docTypes` is free text, not a closed enum: legal authors
+ * descriptions ("Value in dollar", "Number of items"), not
+ * document formats. Surfaced to the claimant as "what would help".
+ * ============================================================ */
+
+export const OnContradictionSchema = z.enum(["CORRECT", "ESCALATE"]);
+export type OnContradiction = z.infer<typeof OnContradictionSchema>;
+
+const EvidenceCheckableSchema = z.object({
+  checkable: z.literal(true),
+  expect: z.string().min(1),
+  docTypes: z.array(z.string().min(1)).min(1),
+  correctable: z.boolean(),
+  // Legal's authoring template omits this; CORRECT is the only value
+  // consistent with correctable: true (see the RulesFileSchema cross-check).
+  onContradiction: OnContradictionSchema.default("CORRECT"),
+});
+
+const EvidenceUncheckableSchema = z.object({
+  checkable: z.literal(false),
+  reason: z.string().min(1), // why no document could speak to it
+});
+
+export const EvidenceSchema = z.discriminatedUnion("checkable", [
+  EvidenceCheckableSchema,
+  EvidenceUncheckableSchema,
+]);
+export type Evidence = z.infer<typeof EvidenceSchema>;
+export type CheckableEvidence = Extract<Evidence, { checkable: true }>;
+
+/* ============================================================
  * GATE — legal's authoring template, plus four additions:
  *   scope, category  → which phase / which claim type
  *   question         → what the UI asks the claimant (description
@@ -89,6 +130,7 @@ const GateFields = {
   missingMessage: z.string(), // the table's "If unknown: follow-up question"
   exceptions: z.string().optional(),
   source: SourceSchema,
+  evidence: EvidenceSchema.optional(), // absent = not yet labelled by legal
 };
 
 const GateBaseSchema = z.object(GateFields);
@@ -247,6 +289,12 @@ export const RulesFileSchema = z
         const prev = fieldTypes.get(key);
         if (prev && prev !== sig) issue(["gates", g.id], `field "${g.field}" has conflicting answerType/options across gates`);
         fieldTypes.set(key, sig);
+      }
+
+      // ESCALATE means "don't offer a correction, send it to a human".
+      // Marking the same gate correctable contradicts that.
+      if (g.evidence?.checkable && g.evidence.correctable && g.evidence.onContradiction === "ESCALATE") {
+        issue(["gates", g.id], `evidence: correctable true cannot be paired with onContradiction ESCALATE`);
       }
     });
   });

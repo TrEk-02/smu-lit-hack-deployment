@@ -1,10 +1,19 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { EvaluateResponse } from "@/lib/api";
+import type {
+  Disagreement,
+  EvaluateResponse,
+  EvidenceResponse,
+} from "@/lib/api";
+import ChallengePanel, { type ChallengeOutcome } from "./challenge-panel";
+import EvidencePanel from "./evidence-panel";
+import { AnswerInput, type FormQuestion } from "./answer-input";
+import type { ChallengeQuestion } from "@/lib/challenge";
+import type { Provenance } from "@/lib/llm/provenance";
 import { computeFilingFee } from "@/lib/filing-fee";
 import type {
-  AnswerType,
+  AnswerValue,
   Answers,
   Category,
   PartyQuestion,
@@ -24,7 +33,7 @@ type CategoryConfigResponse = {
   questions: Question[];
 };
 
-type Step = "general" | "category" | "party" | "review";
+type Step = "general" | "category" | "party" | "review" | "evidence" | "challenge";
 
 export default function Home() {
   const [step, setStep] = useState<Step>("general");
@@ -40,6 +49,16 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("");
 
   const [verdict, setVerdict] = useState<EvaluateResponse | null>(null);
+
+  /*
+   * Evidence + challenge state lives here, not in the panels: the challenge
+   * round consumes the findings, and the review screen shows the provenance
+   * badges, so both outlive the panel that produced them.
+   */
+  const [evidenceResult, setEvidenceResult] = useState<EvidenceResponse | null>(null);
+  const [challengeQuestions, setChallengeQuestions] = useState<ChallengeQuestion[]>([]);
+  const [disagreements, setDisagreements] = useState<Disagreement[]>([]);
+  const [verdictChanged, setVerdictChanged] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -98,168 +117,28 @@ export default function Home() {
   }
 
   /*
-   * Shared shape for anything renderQuestion/renderInput can draw —
-   * both eligibility Questions and party-field PartyQuestions.
-   */
-  type FormQuestion = Pick<Question, "field" | "question" | "answerType" | "options">;
-
-  /*
-   * Convert HTML input values into the type expected by the
-   * backend.
-   *
-   * <input> values arrive as strings, but a number rule expects
-   * a number.
-   */
-
-  function handleInputChange(
-    setter: React.Dispatch<React.SetStateAction<Answers>>,
-    question: FormQuestion,
-    rawValue: string
-  ) {
-    if (rawValue === "") {
-      updateAnswer(setter, question.field, null);
-      return;
-    }
-
-    if (question.answerType === "number") {
-      const numberValue = Number(rawValue);
-
-      updateAnswer(
-        setter,
-        question.field,
-        Number.isNaN(numberValue) ? null : numberValue
-      );
-
-      return;
-    }
-
-    updateAnswer(setter, question.field, rawValue);
-  }
-
-  /*
    * ------------------------------------------------------------
-   * Render one question
+   * Render one question. The input itself lives in AnswerInput so
+   * the challenge round asks a gate the same way this form does.
    * ------------------------------------------------------------
    */
 
   function renderQuestion(
-    question: FormQuestion,
+    question: FormQuestion & { question: string },
     currentAnswers: Answers,
     setter: React.Dispatch<React.SetStateAction<Answers>>
   ) {
-    const value = currentAnswers[question.field];
-
     return (
       <div className="field" key={question.field}>
-        <label htmlFor={question.field}>
-          {question.question}
-        </label>
+        <label htmlFor={question.field}>{question.question}</label>
 
-        {renderInput(question, value, setter)}
+        <AnswerInput
+          question={question}
+          value={currentAnswers[question.field]}
+          onChange={(value) => updateAnswer(setter, question.field, value)}
+        />
       </div>
     );
-  }
-
-  function renderInput(
-    question: FormQuestion,
-    value: Answers[string],
-    setter: React.Dispatch<React.SetStateAction<Answers>>
-  ) {
-    switch (question.answerType as AnswerType) {
-      case "text":
-        return (
-          <textarea
-            id={question.field}
-            value={typeof value === "string" ? value : ""}
-            rows={2}
-            onChange={(event) =>
-              handleInputChange(
-                setter,
-                question,
-                event.target.value
-              )
-            }
-          />
-        );
-
-      case "number":
-        return (
-          <input
-            id={question.field}
-            type="number"
-            step="0.01"
-            value={typeof value === "number" ? value : ""}
-            placeholder="Enter a number"
-            onChange={(event) =>
-              handleInputChange(
-                setter,
-                question,
-                event.target.value
-              )
-            }
-          />
-        );
-
-      case "select":
-        return (
-          <select
-            id={question.field}
-            value={typeof value === "string" ? value : ""}
-            onChange={(event) =>
-              handleInputChange(
-                setter,
-                question,
-                event.target.value
-              )
-            }
-          >
-            <option value="">Select an option</option>
-
-            {(question.options ?? []).map((option) => (
-              <option
-                key={option.value}
-                value={option.value}
-              >
-                {option.label}
-              </option>
-            ))}
-          </select>
-        );
-
-      case "boolean":
-        return (
-          <select
-            id={question.field}
-            value={
-              typeof value === "boolean"
-                ? String(value)
-                : ""
-            }
-            onChange={(event) => {
-              if (event.target.value === "") {
-                updateAnswer(
-                  setter,
-                  question.field,
-                  null
-                );
-              } else {
-                updateAnswer(
-                  setter,
-                  question.field,
-                  event.target.value === "true"
-                );
-              }
-            }}
-          >
-            <option value="">Select an answer</option>
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </select>
-        );
-
-      default:
-        return null;
-    }
   }
 
   /*
@@ -477,6 +356,10 @@ export default function Home() {
     setSelectedCategory("");
     setCategoryConfig(null);
     setVerdict(null);
+    setEvidenceResult(null);
+    setChallengeQuestions([]);
+    setDisagreements([]);
+    setVerdictChanged(false);
     setError(null);
   }
 
@@ -518,6 +401,156 @@ export default function Home() {
 
   /*
    * ------------------------------------------------------------
+   * CHALLENGE ROUND (Sprint 2, Feature 3)
+   *
+   * The model proposed; the engine decides. A confirmed correction
+   * is merged into answers{} and evaluate() is re-run, so the
+   * verdict moves in front of the claimant. A rejected one keeps
+   * their answer and records the disagreement for the handoff.
+   * ------------------------------------------------------------
+   */
+
+  async function startChallenge() {
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const response = await fetch("/api/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generalAnswers: answers,
+          categoryId: selectedCategory,
+          categoryAnswers,
+          findings: evidenceResult?.findings ?? [],
+          unclear: evidenceResult?.unclear ?? [],
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not prepare the questions.");
+
+      setChallengeQuestions(data.questions);
+      setVerdictChanged(false);
+      setStep("challenge");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not prepare the questions.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /** Re-run the deterministic engine over the corrected answers. */
+  async function reEvaluate(nextGeneral: Answers, nextCategory: Answers) {
+    const before = verdict?.category?.status ?? verdict?.general.status;
+
+    const response = await fetch("/api/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generalAnswers: nextGeneral,
+        categoryId: selectedCategory,
+        categoryAnswers: nextCategory,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) return;
+
+    const next = data as EvaluateResponse;
+    setVerdict(next);
+
+    const after = next.category?.status ?? next.general.status;
+    if (before && after !== before) setVerdictChanged(true);
+  }
+
+  function applyOutcome(outcome: ChallengeOutcome) {
+    const { question } = outcome;
+
+    // Where a confirmed answer lands depends on which phase owns the gate.
+    const writeAnswer = (value: AnswerValue) => {
+      const next =
+        question.scope === "general"
+          ? { general: { ...answers, [question.field]: value }, category: categoryAnswers }
+          : { general: answers, category: { ...categoryAnswers, [question.field]: value } };
+
+      if (question.scope === "general") setAnswers(next.general);
+      else setCategoryAnswers(next.category);
+
+      reEvaluate(next.general, next.category);
+    };
+
+    switch (outcome.type) {
+      case "CONFIRMED":
+      case "ANSWERED":
+        writeAnswer(outcome.value);
+        break;
+
+      case "UNKNOWN":
+        // null is "they said they don't know" — MISSING, never a false clearance.
+        writeAnswer(null);
+        break;
+
+      case "REJECTED":
+        // Their answer stands. We do not silently drop a verified contradiction:
+        // a real person should see both sides (DECISIONS.md §Challenge round).
+        if (question.evidence) {
+          setDisagreements((previous) => [
+            ...previous,
+            {
+              gateId: question.gateId,
+              question: question.prompt,
+              claimantAnswer: question.currentAnswerLabel,
+              observation: question.evidence!.observation,
+              quote: question.evidence!.quote,
+              page: question.evidence!.page,
+              reason: question.kind === "ESCALATED" ? "ESCALATED" : "REJECTED",
+            },
+          ]);
+        }
+        break;
+    }
+  }
+
+  if (step === "challenge") {
+    return (
+      <main className="shell">
+        <header className="brand">
+          <strong>Claim guide</strong>
+          <span>Hackathon prototype</span>
+        </header>
+
+        <nav className="steps">
+          <span>01 General details</span>
+          <span>02 Claim category</span>
+          <span>03 Party &amp; filing</span>
+          <span>04 Review</span>
+          <span>05 Your documents</span>
+          <span className="active">06 Your answers</span>
+        </nav>
+
+        <ChallengePanel
+          questions={challengeQuestions}
+          onOutcome={applyOutcome}
+          onFinish={() => setStep("review")}
+          verdictBanner={
+            verdictChanged && verdict ? (
+              <div className="warning">
+                Your eligibility result changed to{" "}
+                <strong>{verdict.category?.status ?? verdict.general.status}</strong> based
+                on what you just confirmed.
+              </div>
+            ) : null
+          }
+        />
+
+        <footer>
+          Independent student prototype · Not an official court service
+        </footer>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
    * REVIEW
    * ------------------------------------------------------------
    */
@@ -533,8 +566,10 @@ export default function Home() {
         <nav className="steps">
           <span>01 Claim details</span>
           <span>02 Claim category</span>
-          <span>03 Party & filing</span>
+          <span>03 Party &amp; filing</span>
           <span className="active">04 Review</span>
+          <span>05 Your documents</span>
+          <span>06 Your answers</span>
         </nav>
 
         <section className="panel">
@@ -543,6 +578,13 @@ export default function Home() {
           </p>
 
           <h1>Review your claim</h1>
+
+          {verdictChanged && (
+            <div className="warning">
+              This result changed after you answered our questions — it is not the
+              result you saw before.
+            </div>
+          )}
 
           <div className="verdict">
             <div className="badge">
@@ -578,6 +620,17 @@ export default function Home() {
             />
           )}
 
+          {evidenceResult && (
+            <ProvenanceSummary
+              evidence={evidenceResult}
+              verdict={verdict}
+            />
+          )}
+
+          {disagreements.length > 0 && (
+            <DisagreementSummary disagreements={disagreements} />
+          )}
+
           <PartyDetailsSummary
             partyQuestions={config?.partyQuestions ?? []}
             partyAnswers={partyAnswers}
@@ -586,6 +639,24 @@ export default function Home() {
           />
 
           <div className="actions">
+            {verdict.category && !evidenceResult && (
+              <button onClick={() => setStep("evidence")}>
+                Check my documents →
+              </button>
+            )}
+
+            {verdict.category && evidenceResult && challengeQuestions.length === 0 && (
+              <button disabled={submitting} onClick={startChallenge}>
+                {submitting ? "Preparing…" : "Answer our questions →"}
+              </button>
+            )}
+
+            {evidenceResult && (
+              <button className="secondary" onClick={() => setStep("evidence")}>
+                Back to documents
+              </button>
+            )}
+
             <button
               className="secondary"
               onClick={() => {
@@ -634,8 +705,9 @@ export default function Home() {
           <span className="active">
             02 Claim category
           </span>
-          <span>03 Party & filing</span>
+          <span>03 Party &amp; filing</span>
           <span>04 Review</span>
+          <span>05 Your documents</span>
         </nav>
 
         <section className="panel">
@@ -723,6 +795,48 @@ export default function Home() {
 
   /*
    * ------------------------------------------------------------
+   * EVIDENCE STEP (Sprint 2, Feature 2)
+   * Checks an uploaded document against the answers already given.
+   * The model proposes; evaluate() still decides.
+   * ------------------------------------------------------------
+   */
+
+  if (step === "evidence") {
+    return (
+      <main className="shell">
+        <header className="brand">
+          <strong>Claim guide</strong>
+          <span>Hackathon prototype</span>
+        </header>
+
+        <nav className="steps">
+          <span>01 General details</span>
+          <span>02 Claim category</span>
+          <span>03 Party &amp; filing</span>
+          <span>04 Review</span>
+          <span className="active">05 Your documents</span>
+        </nav>
+
+        <EvidencePanel
+          generalAnswers={answers}
+          categoryId={selectedCategory}
+          categoryAnswers={categoryAnswers}
+          result={evidenceResult}
+          onResult={setEvidenceResult}
+          onChallenge={startChallenge}
+          preparing={submitting}
+          onBack={() => setStep("review")}
+        />
+
+        <footer>
+          Independent student prototype · Not an official court service
+        </footer>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
    * PARTY & FILING DETAILS STEP (Sprint 2)
    * Pure data capture — no eligibility gates, no /api/evaluate call.
    * ------------------------------------------------------------
@@ -743,8 +857,9 @@ export default function Home() {
         <nav className="steps">
           <span>01 General details</span>
           <span>02 Claim category</span>
-          <span className="active">03 Party & filing</span>
+          <span className="active">03 Party &amp; filing</span>
           <span>04 Review</span>
+          <span>05 Your documents</span>
         </nav>
 
         <section className="panel">
@@ -814,8 +929,9 @@ export default function Home() {
           01 Claim details
         </span>
         <span>02 Claim category</span>
-        <span>03 Party & filing</span>
+        <span>03 Party &amp; filing</span>
         <span>04 Review</span>
+        <span>05 Your documents</span>
       </nav>
 
       <div className="content-grid">
@@ -929,6 +1045,104 @@ export default function Home() {
         Independent student prototype · Not an official court service
       </footer>
     </main>
+  );
+}
+
+/*
+ * ------------------------------------------------------------
+ * Provenance (Sprint 2, Feature 2 + 3)
+ *
+ * Where each answer actually stands: asserted by the claimant,
+ * corroborated by a document, or contradicted by one. The honesty
+ * axis as UI rather than as a slide claim (DECISIONS.md §Evidence).
+ * ------------------------------------------------------------
+ */
+
+const PROVENANCE_COPY: Record<Provenance, { label: string; className: string }> = {
+  ASSERTED: { label: "You said so", className: "badge" },
+  CORROBORATED: { label: "Backed by your document", className: "badge badge-corroborates" },
+  CONTRADICTED: { label: "Your document disagrees", className: "badge badge-contradicts" },
+};
+
+function ProvenanceSummary({
+  evidence,
+  verdict,
+}: {
+  evidence: EvidenceResponse;
+  verdict: EvaluateResponse;
+}) {
+  // Gate id → the question, so a badge is attached to something readable.
+  const questions = new Map<string, string>();
+  for (const result of [...verdict.general.results, ...(verdict.category?.results ?? [])]) {
+    questions.set(result.gateId, result.field);
+  }
+
+  return (
+    <section className="results">
+      <h2>Where your answers stand</h2>
+
+      <p className="hint">
+        Checked against {evidence.checkedGateIds.length} points in your claim.
+        &ldquo;You said so&rdquo; means no document spoke to it — not that it is wrong.
+      </p>
+
+      {evidence.checkedGateIds.map((gateId) => {
+        const provenance = evidence.provenance[gateId] ?? "ASSERTED";
+        const copy = PROVENANCE_COPY[provenance];
+        return (
+          <div className="status-row" key={gateId}>
+            <strong>{questions.get(gateId) ?? gateId}</strong>
+            <span className={copy.className}>{copy.label}</span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/*
+ * ------------------------------------------------------------
+ * Disagreements (Sprint 2, Feature 3)
+ *
+ * A verified contradiction the claimant rejected is not dropped.
+ * Their answer stands, and both sides are carried into the Sprint 3
+ * handoff brief so a real person sees them.
+ * ------------------------------------------------------------
+ */
+
+function DisagreementSummary({ disagreements }: { disagreements: Disagreement[] }) {
+  return (
+    <section className="results">
+      <h2>Where we still disagree</h2>
+
+      <p className="hint">
+        You kept your answer on these. We have kept it too — and noted why your
+        document appeared to say otherwise, so whoever helps you next sees both.
+      </p>
+
+      {disagreements.map((item) => (
+        <article className="gate-result" key={`${item.gateId}-${item.reason}`}>
+          <div className="gate-header">
+            <strong>{item.question}</strong>
+            <span className="badge badge-contradicts">
+              {item.reason === "ESCALATED" ? "For a person to review" : "You disagreed"}
+            </span>
+          </div>
+
+          <div className="status-row">
+            <strong>Your answer</strong>
+            <span>{item.claimantAnswer}</span>
+          </div>
+
+          <p>{item.observation}</p>
+
+          <blockquote className="quote">
+            “{item.quote}”
+            <cite>your document, page {item.page}</cite>
+          </blockquote>
+        </article>
+      ))}
+    </section>
   );
 }
 

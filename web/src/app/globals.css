@@ -37,6 +37,21 @@ footer { padding: 28px 0; color: #617184; font-size: 13px; }
 dt { font-weight: 700; font-size: 14px; }dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .summary > div { display: grid; grid-template-columns: 165px minmax(0, 1fr); gap: 15px; border-bottom: 1px solid #e1e7ee; padding: 15px 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.error { background: #fdecec; border-left: 4px solid #b3261e; padding: 13px 18px; margin: 18px 0; font-size: 14px; }
+.warning { background: #fff5e0; border-left: 4px solid #a9700d; padding: 13px 18px; margin: 18px 0; font-size: 14px; }
+.status-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e1e7ee; }
+.gate-result { border: 1px solid #dce3ec; border-radius: 10px; padding: 20px; margin: 16px 0; background: white; }
+.gate-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 10px; }
+.gate-header strong { font-size: 15px; }
+.badge-contradicts { color: #7a1d16; background: #fdd9d5; }
+.badge-corroborates { color: #14532d; background: #d6f0dd; }
+.quote { margin: 14px 0; padding: 13px 18px; background: #f1f6fa; border-left: 4px solid #45708e; font-style: italic; }
+.quote cite { display: block; margin-top: 7px; font-style: normal; font-size: 13px; color: #536477; }
+.source { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e1e7ee; font-size: 13px; color: #536477; }
+.source p { margin: 4px 0 0; }
+.follow-ups { margin-top: 24px; }
+.follow-up { padding: 12px 0; border-bottom: 1px solid #e1e7ee; font-size: 14px; }
+.follow-up p { margin: 5px 0 0; color: #536477; }
 .secondary { color: #153a59; background: white; border-color: #aab8c7; }.secondary:hover { background: #eef3f8; }
 @media (max-width: 800px) { .workspace { grid-template-columns: 1fr; } aside { padding: 0 8px; } }
 @media (max-width: 520px) { .shell { padding: 0 16px; } .panel { padding: 23px 18px; } .row { grid-template-columns: 1fr; gap: 0; } .summary > div { grid-template-columns: 1fr; gap: 4px; } header > span { max-width: 100px; text-align: right; } .steps { gap: 22px; } }

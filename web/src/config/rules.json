@@ -79,7 +79,13 @@
       "plainExplanation": "Contracts don't need to be written to be enforceable in Singapore, except specific categories (real property, guarantees). Oral and implied contracts are equally valid, but harder to evidence.",
       "missingMessage": "Did money change hands, was anything delivered, or did you exchange any messages or receipts confirming what was agreed?",
       "exceptions": "A contract can form through conduct alone. Contracts for the sale or lease of land, and guarantees, must be in writing under the Civil Law Act — flag if the claim touches these.",
-      "source": { "title": "Civil Law Act 1909; general common law of contract formation", "provision": "Civil Law Act 1909 (writing requirements for specific contracts)", "url": "" }
+      "source": { "title": "Civil Law Act 1909; general common law of contract formation", "provision": "Civil Law Act 1909 (writing requirements for specific contracts)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A written document, oral agreement recorded as witness statements, emails, messages, or conduct made",
+        "docTypes": ["witness statements", "emails", "messages", "conduct of delivery"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -96,7 +102,13 @@
       "plainExplanation": "Establishes the contract's subject matter, which determines which statutory implied terms apply (Sale of Goods Act for goods; general contract and tort principles for services).",
       "missingMessage": "Can you describe exactly what was being sold, or what work was being done?",
       "exceptions": "If the agreement was for a class of goods or services (e.g. 'a laptop suitable for gaming') rather than a specific item, the implied 'fitness for purpose' term becomes more central than an exact-match description term.",
-      "source": { "title": "Sale of Goods Act 1979", "provision": "ss 13–15 (description, quality, fitness for purpose)", "url": "" }
+      "source": { "title": "Sale of Goods Act 1979", "provision": "ss 13–15 (description, quality, fitness for purpose)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A description of the good(s) or service(s) that was delivered/performed",
+        "docTypes": ["description of goods or services"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -113,7 +125,13 @@
       "plainExplanation": "Consideration — something of value exchanged — is a basic requirement for contract formation under Singapore law.",
       "missingMessage": "What was the buyer supposed to give in return — money, goods, or something else?",
       "exceptions": "Consideration doesn't have to be money — goods, services, or a promise all count; barter arrangements are still valid contracts.",
-      "source": { "title": "General contract law", "provision": "Requirement of consideration", "url": "" }
+      "source": { "title": "General contract law", "provision": "Requirement of consideration", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A price that was paid for the goods or services.",
+        "docTypes": ["Value in dollar"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -135,7 +153,13 @@
       "plainExplanation": "Time of performance affects when breach occurs. If no date was fixed, the law implies performance within a 'reasonable time' — that is not automatically a bar to a claim, but it is harder to show delay.",
       "missingMessage": "Did either party mention a deadline, or was anything said about how soon this would be done?",
       "exceptions": "If no date was fixed, the law implies performance must occur within a 'reasonable time', assessed by trade norms and context.",
-      "source": { "title": "Sale of Goods Act 1979", "provision": "s 29 (time of delivery); general contract law on implied reasonable time", "url": "" }
+      "source": { "title": "Sale of Goods Act 1979", "provision": "s 29 (time of delivery); general contract law on implied reasonable time", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A stated date or timeframe for the delivery/performance.",
+        "docTypes": ["Date", "Timeframe"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -152,7 +176,13 @@
       "plainExplanation": "Interim milestones help establish a pattern of breach or reasonable reliance, useful for showing when things started going wrong.",
       "missingMessage": "Was anything supposed to happen at any point before the final delivery or completion?",
       "exceptions": "Absence of interim milestones doesn't affect the main claim unless one was expressly linked to a right (e.g. 'deposit due within 7 days or contract voidable').",
-      "source": { "title": "General contract law", "provision": "Evidentiary factor, not a separate statutory obligation", "url": "" }
+      "source": { "title": "General contract law", "provision": "Evidentiary factor, not a separate statutory obligation", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A stated date corresponding to the delivery of the performance of services or delivery of goods.",
+        "docTypes": ["Date", "Progress Updates"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -174,7 +204,13 @@
       "plainExplanation": "Even without an express quality clause, the law implies goods must be of satisfactory quality and services performed with reasonable care and skill.",
       "missingMessage": "What exactly was wrong with what you received, compared with what you expected?",
       "exceptions": "If goods were sold explicitly 'as-is', or defects were pointed out and accepted, quality obligations may be excluded or limited — check for this.",
-      "source": { "title": "Sale of Goods Act 1979; common law", "provision": "s 14 (satisfactory quality, fitness for purpose); duty of reasonable care and skill for services", "url": "" }
+      "source": { "title": "Sale of Goods Act 1979; common law", "provision": "s 14 (satisfactory quality, fitness for purpose); duty of reasonable care and skill for services", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A description of the quality of the goods or services.",
+        "docTypes": ["Descriptions of quality of goods and services"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -196,14 +232,20 @@
       "plainExplanation": "Establishes the measurable scope of performance, needed to quantify damages later. Without an agreed quantity it is hard to show a shortfall — reframe around quality or completeness instead.",
       "missingMessage": "How much or how many were you supposed to get, and how much did you actually receive? Was there a minimum you needed?",
       "exceptions": "Partial delivery may still discharge part of the obligation — check whether partial performance was accepted or rejected.",
-      "source": { "title": "Sale of Goods Act 1979", "provision": "s 30 (delivery of wrong quantity)", "url": "" }
+      "source": { "title": "Sale of Goods Act 1979", "provision": "s 30 (delivery of wrong quantity)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A specific quantity of goods or service - number of goods and duration or type of service.",
+        "docTypes": ["Number of items", "Duration of service in time"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
       "category": "BREACH_OF_CONTRACT",
       "id": "boc_price_agreed",
       "status": "published",
-      "description": "Payment Terms — price agreed and any change.",
+      "description": "Payment Terms — price agreed and any subsequent change.",
       "question": "Was a clear price agreed at the start?",
       "field": "originalPriceClear",
       "answerType": "boolean",
@@ -213,7 +255,13 @@
       "plainExplanation": "A unilateral price change without the other party's consent is generally not enforceable — central to unfair pricing complaints. With no clear original price, you may have to rely on a 'reasonable price'.",
       "missingMessage": "Was a price ever explicitly stated or written down? Did the amount you were asked to pay change from what was first discussed?",
       "exceptions": "A price increase communicated and accepted (even implicitly, e.g. paying without objection) may bind the claimant; an increase imposed unilaterally without consent may not.",
-      "source": { "title": "General contract law; Consumer Protection (Fair Trading) Act", "provision": "Variation of terms (requires mutual consent); CPFTA unfair practices (B2C)", "url": "" }
+      "source": { "title": "General contract law; Consumer Protection (Fair Trading) Act", "provision": "Variation of terms (requires mutual consent); CPFTA unfair practices (B2C)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A specific price point, or a change in price.",
+        "docTypes": ["Money in terms of singapore dollar"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -230,7 +278,13 @@
       "plainExplanation": "Interest is not automatically implied into commercial contracts — it must typically be agreed, or claimed as statutory interest on the judgment sum itself.",
       "missingMessage": "Did anyone mention what would happen if payment was late — any extra charges or interest?",
       "exceptions": "If no interest rate was agreed, none can generally be claimed unless implied by statute or established trade practice; excessive rates may themselves be challengeable.",
-      "source": { "title": "General contract law; Small Claims Tribunals Act", "provision": "Power to award interest on judgment sums, distinct from contractual interest", "url": "" }
+      "source": { "title": "General contract law; Small Claims Tribunals Act", "provision": "Power to award interest on judgment sums, distinct from contractual interest", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "An interest rate or credit limit.",
+        "docTypes": ["Interest rate", "Credit Limit"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -247,7 +301,13 @@
       "plainExplanation": "Relevant mainly where a dispute arises over refusal of a particular payment form causing delay or breach.",
       "missingMessage": "How was payment actually made, or supposed to be made?",
       "exceptions": "If no form was specified, any commercially reasonable form is generally acceptable.",
-      "source": { "title": "General contract law", "provision": "Implied term of reasonable manner of performance", "url": "" }
+      "source": { "title": "General contract law", "provision": "Implied term of reasonable manner of performance", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "An written or oral record of the form of payment that was supposed to be made.",
+        "docTypes": ["Written Record", "Oral record", "Specifications on form of payment"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -263,7 +323,13 @@
       "onFail": "WEAKNESS",
       "plainExplanation": "Largely an evidence-gathering point rather than a distinct legal obligation — it supports proof that payment (or non-payment) occurred. Retrieve bank or payment-app records before filing.",
       "missingMessage": "Can you check your bank or payment app for a record of the transaction?",
-      "source": { "title": "Evidentiary best practice", "provision": "Not a distinct statutory term", "url": "" }
+      "source": { "title": "Evidentiary best practice", "provision": "Not a distinct statutory term", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A form of record to show how the money was transferred such as a bank transfer record, credit card record, witness statement of cash passed to the respondent.",
+        "docTypes": ["Bank Transfer record", "Credit card record", "Witness statement of cash passed to the respondent"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -280,7 +346,13 @@
       "plainExplanation": "Establishes exactly when the payment obligation was triggered, needed to assess whether late or non-payment actually constitutes a breach yet.",
       "missingMessage": "Was there ever a due date mentioned for payment, or an invoice with payment terms?",
       "exceptions": "If unspecified, payment is generally implied due on or around delivery or completion, unless trade practice suggests otherwise.",
-      "source": { "title": "Sale of Goods Act 1979", "provision": "s 28 (payment and delivery as concurrent conditions, absent contrary agreement)", "url": "" }
+      "source": { "title": "Sale of Goods Act 1979", "provision": "s 28 (payment and delivery as concurrent conditions, absent contrary agreement)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A stated due date or payment term - payable upfront, on delivery, or after a credit period such as '30 days from invoice'.",
+        "docTypes": ["invoice", "contract", "payment terms", "messages"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -302,7 +374,13 @@
       "plainExplanation": "If you did not meet a condition you had to satisfy first, the other party's non-performance may be excused — this goes to who breached first.",
       "missingMessage": "Was there anything you had to do first before the other side would deliver or perform?",
       "exceptions": "If the other party waived the condition by their conduct (e.g. proceeding without requiring it), it may no longer be enforceable against you.",
-      "source": { "title": "General contract law", "provision": "Conditions precedent and concurrent conditions", "url": "" }
+      "source": { "title": "General contract law", "provision": "Conditions precedent and concurrent conditions", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A statement showing deposit being paid, evidence of some information that was useful to the seller.",
+        "docTypes": ["Bank statement", "Email or written record of information"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -319,7 +397,13 @@
       "plainExplanation": "Conditions the other side had to satisfy first are critical to establishing who actually breached first.",
       "missingMessage": "Was the other side supposed to inspect, certify or deliver anything before you were obliged to pay or accept?",
       "exceptions": "A buyer accepting goods or services despite an unmet condition may lose the right to rely on it later.",
-      "source": { "title": "General contract law", "provision": "Conditions precedent and concurrent conditions", "url": "" }
+      "source": { "title": "General contract law", "provision": "Conditions precedent and concurrent conditions", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A notice, any late invoice or receipts, or witness statements that show the condition precedent and if the seller waived the condition precedent",
+        "docTypes": ["invoice", "receipt", "notice", "witness statements", "texts"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -341,7 +425,13 @@
       "plainExplanation": "Timely notice affects whether a defect claim remains open — prolonged silence can be read as having accepted the goods 'as is'.",
       "missingMessage": "When did you first raise the problem with the other party, and how — call, message, email?",
       "exceptions": "Even without an express notice clause, a buyer who delays too long in complaining about defects may be treated as having accepted the goods.",
-      "source": { "title": "Sale of Goods Act 1979; general contract law", "provision": "s 35 (acceptance by lapse of time); notice and waiver", "url": "" }
+      "source": { "title": "Sale of Goods Act 1979; general contract law", "provision": "s 35 (acceptance by lapse of time); notice and waiver", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A notice, any late invoice or receipts, or witness statements that show when you notified the seller or provider or respondent of the issues",
+        "docTypes": ["invoice", "receipt", "notice", "witness statements", "texts"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -358,7 +448,13 @@
       "plainExplanation": "A seller's failure to give reasonable notice of known problems can aggravate a breach claim or support a separate claim.",
       "missingMessage": "Did the other party say anything in advance about a delay or a problem?",
       "exceptions": "Silence by a seller who knew of a problem and said nothing may itself support a claim (e.g. misrepresentation by omission in some circumstances).",
-      "source": { "title": "General contract law; Consumer Protection (Fair Trading) Act", "provision": "Non-disclosure as unfair practice (B2C only)", "url": "" }
+      "source": { "title": "General contract law; Consumer Protection (Fair Trading) Act", "provision": "Non-disclosure as unfair practice (B2C only)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A notice, any late invoice or receipts, or witness statements that show the seller notified late or after they should have told you about the delay or other bad news",
+        "docTypes": ["invoice", "receipt", "notice", "witness statements", "texts"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -375,7 +471,13 @@
       "plainExplanation": "Relevant mainly if the dispute itself involves an alleged breach of confidentiality — not typically central to payment or quality disputes.",
       "missingMessage": "Did either side ask the other to keep details of the deal confidential?",
       "exceptions": "Confidentiality obligations are rare in simple consumer transactions — mainly relevant in B2B claims involving sensitive information.",
-      "source": { "title": "General contract and equity principles", "provision": "Implied confidentiality in certain business relationships", "url": "" }
+      "source": { "title": "General contract and equity principles", "provision": "Implied confidentiality in certain business relationships", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A contract, recording, text or witness statements that show the necessary nature of a confidentiality agreement or a promise not to disclose",
+        "docTypes": ["invoice", "receipt", "witness statement", "text"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -392,7 +494,13 @@
       "plainExplanation": "Your damages can be reduced — though not eliminated — if you failed to take reasonable steps to limit your own loss once the breach became apparent.",
       "missingMessage": "After things went wrong, what did you do next — ask for a fix, a refund, stop paying, or find another provider?",
       "exceptions": "The duty to mitigate does not require accepting an unreasonable substitute or incurring excessive further cost.",
-      "source": { "title": "General contract law", "provision": "Duty to mitigate loss", "url": "" }
+      "source": { "title": "General contract law", "provision": "Duty to mitigate loss", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A receipt, invoice, or witness statements that show the claimant tried to reduce their loss",
+        "docTypes": ["invoice", "receipt", "witness statement"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -414,7 +522,13 @@
       "plainExplanation": "Warranty periods define the window during which defects are presumed attributable to the seller rather than misuse. Under Singapore's Lemon Law, a defect appearing within 6 months is presumed to have existed at delivery.",
       "missingMessage": "Was anything said about how long the product or service was guaranteed for? Roughly when did the problem appear compared with when you bought it?",
       "exceptions": "Even without an express warranty, the implied satisfactory-quality obligation covers a reasonable period after purchase.",
-      "source": { "title": "Consumer Protection (Fair Trading) Act; Sale of Goods Act 1979", "provision": "Lemon Law provisions (6-month presumption); SOGA s 14", "url": "" }
+      "source": { "title": "Consumer Protection (Fair Trading) Act; Sale of Goods Act 1979", "provision": "Lemon Law provisions (6-month presumption); SOGA s 14", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A contract, receipt, invoice, or witness statements about duration of the warranties and any extension period for warranties",
+        "docTypes": ["invoice", "receipt", "contract"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -431,7 +545,13 @@
       "plainExplanation": "For defective goods the law sets a remedy hierarchy — repair or replace first, then refund or price reduction. Asking for one of these is usually the first step, and a blanket 'no refunds' sign cannot take these statutory rights away in a consumer sale.",
       "missingMessage": "Did you see or agree to any return or refund policy, and have you asked for a refund, repair or replacement?",
       "exceptions": "'No refund' policies do not override a consumer's statutory right to a remedy for non-conforming goods — flag if the business relies purely on a blanket no-refund sign.",
-      "source": { "title": "Consumer Protection (Fair Trading) Act; Sale of Goods Act 1979", "provision": "CPFTA; SOGA ss 48A–48F (remedies for defective goods)", "url": "" }
+      "source": { "title": "Consumer Protection (Fair Trading) Act; Sale of Goods Act 1979", "provision": "CPFTA; SOGA ss 48A–48F (remedies for defective goods)", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "A contract, receipt, invoice, or witness statements about refund, return, exchange or price reductions and how to access those.",
+        "docTypes": ["invoice", "receipt", "contract"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -448,7 +568,13 @@
       "plainExplanation": "The other party may try to rely on a cap or exclusion. These are often overstated: clauses that exclude liability for statutory implied terms are void or restricted in consumer contracts, though more readily enforceable between businesses if reasonable.",
       "missingMessage": "Check any receipt, terms and conditions or contract for wording about limits on the other party's responsibility.",
       "exceptions": "Exclusion clauses that try to exclude liability for statutory implied terms are void or restricted in consumer contracts under the Unfair Contract Terms Act; in B2B contracts such clauses are more readily enforceable if reasonable.",
-      "source": { "title": "Unfair Contract Terms Act 1977; Consumer Protection (Fair Trading) Act", "provision": "UCTA 1977 (Singapore); CPFTA", "url": "" }
+      "source": { "title": "Unfair Contract Terms Act 1977; Consumer Protection (Fair Trading) Act", "provision": "UCTA 1977 (Singapore); CPFTA", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "Check the contract to see if parties contemplated a limit or cap on the amount of liability undertaken in the case of any breach of the contract",
+        "docTypes": ["contract", "recordings", "witness statements"],
+        "correctable": true
+      }
     },
     {
       "scope": "category",
@@ -465,7 +591,13 @@
       "plainExplanation": "Indemnities shift risk for specific losses beyond ordinary damages — relevant mainly to B2B disputes involving third-party claims.",
       "missingMessage": "Did the contract mention anything about one side covering the other's losses?",
       "exceptions": "Indemnity clauses are rare in simple consumer transactions.",
-      "source": { "title": "General contract law", "provision": "Indemnity as a distinct contractual remedy from damages", "url": "" }
+      "source": { "title": "General contract law", "provision": "Indemnity as a distinct contractual remedy from damages", "url": "" },
+      "evidence": {
+        "checkable": true,
+        "expect": "Check the contract to see if parties contemplated third-party claims in the case of failed performance of the service or delivery of goods",
+        "docTypes": ["contract", "recordings", "witness statements"],
+        "correctable": true
+      }
     }
   ],
 
