@@ -621,10 +621,7 @@ export default function Home() {
           )}
 
           {evidenceResult && (
-            <ProvenanceSummary
-              evidence={evidenceResult}
-              verdict={verdict}
-            />
+            <ProvenanceSummary evidence={evidenceResult} />
           )}
 
           {disagreements.length > 0 && (
@@ -1064,34 +1061,23 @@ const PROVENANCE_COPY: Record<Provenance, { label: string; className: string }> 
   CONTRADICTED: { label: "Your document disagrees", className: "badge badge-contradicts" },
 };
 
-function ProvenanceSummary({
-  evidence,
-  verdict,
-}: {
-  evidence: EvidenceResponse;
-  verdict: EvaluateResponse;
-}) {
-  // Gate id → the question, so a badge is attached to something readable.
-  const questions = new Map<string, string>();
-  for (const result of [...verdict.general.results, ...(verdict.category?.results ?? [])]) {
-    questions.set(result.gateId, result.field);
-  }
+function ProvenanceSummary({ evidence }: { evidence: EvidenceResponse }) {
 
   return (
     <section className="results">
       <h2>Where your answers stand</h2>
 
       <p className="hint">
-        Checked against {evidence.checkedGateIds.length} points in your claim.
+        Checked against {evidence.checked.length} points in your claim.
         &ldquo;You said so&rdquo; means no document spoke to it — not that it is wrong.
       </p>
 
-      {evidence.checkedGateIds.map((gateId) => {
-        const provenance = evidence.provenance[gateId] ?? "ASSERTED";
+      {evidence.checked.map((entry) => {
+        const provenance = evidence.provenance[entry.gateId] ?? "ASSERTED";
         const copy = PROVENANCE_COPY[provenance];
         return (
-          <div className="status-row" key={gateId}>
-            <strong>{questions.get(gateId) ?? gateId}</strong>
+          <div className="status-row" key={entry.gateId}>
+            <strong>{entry.question}</strong>
             <span className={copy.className}>{copy.label}</span>
           </div>
         );

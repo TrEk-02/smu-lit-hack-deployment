@@ -117,8 +117,8 @@ export type EvidenceResponse = {
   provenance: Record<string, Provenance>;
   /** Findings discarded because their quote was not in the document. Shown, not hidden. */
   droppedFindings: number;
-  /** Gates that were actually checked, for the provenance display. */
-  checkedGateIds: string[];
+  /** Gates that were actually checked, with their question, for the provenance display. */
+  checked: { gateId: string; question: string }[];
   /** true → output is a demo fixture, and must be labelled as one in the UI. */
   stubbed: boolean;
 };

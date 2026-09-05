@@ -111,7 +111,8 @@ export async function POST(req: Request) {
     });
   }
 
-  const checkedGateIds = gates.map((gate) => gate.id);
+  const checked = gates.map((gate) => ({ gateId: gate.id, question: gate.question }));
+  const checkedGateIds = checked.map((entry) => entry.gateId);
 
   const body: EvidenceResponse = {
     docId: doc.docId,
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
       .filter((item) => item.question !== ""),
     provenance: provenanceByGate(checkedGateIds, ranked),
     droppedFindings: dropped,
-    checkedGateIds,
+    checked,
     stubbed: isStubbed(),
   };
 
