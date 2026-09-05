@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { AnswersSchema, CategorySchema, GateResultSchema, PhaseStatusSchema } from "../../../lib/types";
-import type { Question } from "../../../lib/types";
+import { AnswersSchema, CategorySchema, GateResultSchema, PhaseStatusSchema } from "./types";
+import type { Question } from "./types";
 
 /* ============================================================
  * GET /api/config  →  ConfigResponse

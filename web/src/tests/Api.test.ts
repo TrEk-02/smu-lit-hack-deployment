@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EvaluateRequestSchema } from "../app/api/evaluate/api";
+import { EvaluateRequestSchema } from "../lib/api";
 
 describe("EvaluateRequestSchema", () => {
   it("accepts general answers alone", () => {

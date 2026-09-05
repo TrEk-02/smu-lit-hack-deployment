@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { GET as configGET } from "../app/api/config/route";
-import { GET as catGET } from "../app/api/config/BREACH_OF_CONTRACT/route";
+import { GET as catGET } from "../app/api/config/[categoryId]/route";
 import { POST } from "../app/api/evaluate/route";
 
 const post = (body: unknown) =>
