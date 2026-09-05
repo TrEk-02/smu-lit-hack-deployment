@@ -78,9 +78,7 @@ The APIs (app/api/) — built, tested, working
 
 ### Feature: Party & filing details (Story 1)
 
-**Why**: Unlocks five general gates already in `rules.json` — respondent
-serviceable in Singapore (SCT Act s 5(1)(b), s 19) and representation
-requirements. Also gives the LLM a party frame so it can tell "what I paid"
+**Why**: Unlocks representation requirements. Also gives the LLM a party frame so it can tell "what I paid"
 from "what they invoiced" when reading a document.
 
 **Fields** (another page, if Sprint 1 form passes): should adhere to Sprint 2's set questions provided in the Project memory 
