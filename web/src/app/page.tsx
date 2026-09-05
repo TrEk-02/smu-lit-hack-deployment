@@ -1,59 +1,906 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { MOCK_VERDICT, type IntakeDraft } from "@/lib/mock-verdict";
+import { FormEvent, useEffect, useState } from "react";
+import type { EvaluateResponse } from "@/lib/api";
+import type {
+  AnswerType,
+  Answers,
+  Category,
+  Question,
+} from "@/lib/types";
 
-const EMPTY: IntakeDraft = { claimType: "", claimAmount: "", incidentDate: "", description: "", evidence: "" };
+type ConfigResponse = {
+  version?: string;
+  ready: boolean;
+  categories: Category[];
+  generalQuestions: Question[];
+};
+
+type CategoryConfigResponse = {
+  category: Category;
+  questions: Question[];
+};
+
+type Step = "general" | "category" | "review";
 
 export default function Home() {
-  const [answers, setAnswers] = useState<IntakeDraft>(EMPTY);
-  const [review, setReview] = useState(false);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const initial = useRef(true);
+  const [step, setStep] = useState<Step>("general");
+
+  const [config, setConfig] = useState<ConfigResponse | null>(null);
+  const [categoryConfig, setCategoryConfig] =
+    useState<CategoryConfigResponse | null>(null);
+
+  const [answers, setAnswers] = useState<Answers>({});
+  const [categoryAnswers, setCategoryAnswers] = useState<Answers>({});
+
+  const [selectedCategory, setSelectedCategory] = useState("");
+
+  const [verdict, setVerdict] = useState<EvaluateResponse | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /*
+   * ------------------------------------------------------------
+   * Load the general configuration
+   * ------------------------------------------------------------
+   */
+
   useEffect(() => {
-    if (initial.current) { initial.current = false; return; }
-    heading.current?.focus();
-  }, [review]);
-  function update(key: keyof IntakeDraft, value: string) {
-    setAnswers((previous) => ({ ...previous, [key]: value }));
+    async function loadConfig() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch("/api/config");
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "Unable to load configuration");
+        }
+
+        setConfig(data);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load configuration"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadConfig();
+  }, []);
+
+  /*
+   * ------------------------------------------------------------
+   * Generic answer handling
+   * ------------------------------------------------------------
+   */
+
+  function updateAnswer(
+    setter: React.Dispatch<React.SetStateAction<Answers>>,
+    field: string,
+    value: string | number | boolean | null
+  ) {
+    setter((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
+
+  /*
+   * Convert HTML input values into the type expected by the
+   * backend.
+   *
+   * <input> values arrive as strings, but a number rule expects
+   * a number.
+   */
+
+  function handleInputChange(
+    setter: React.Dispatch<React.SetStateAction<Answers>>,
+    question: Question,
+    rawValue: string
+  ) {
+    if (rawValue === "") {
+      updateAnswer(setter, question.field, null);
+      return;
+    }
+
+    if (question.answerType === "number") {
+      const numberValue = Number(rawValue);
+
+      updateAnswer(
+        setter,
+        question.field,
+        Number.isNaN(numberValue) ? null : numberValue
+      );
+
+      return;
+    }
+
+    updateAnswer(setter, question.field, rawValue);
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Render one question
+   * ------------------------------------------------------------
+   */
+
+  function renderQuestion(
+    question: Question,
+    currentAnswers: Answers,
+    setter: React.Dispatch<React.SetStateAction<Answers>>
+  ) {
+    const value = currentAnswers[question.field];
+
+    return (
+      <div className="field" key={question.field}>
+        <label htmlFor={question.field}>
+          {question.question}
+        </label>
+
+        {renderInput(question, value, setter)}
+      </div>
+    );
+  }
+
+  function renderInput(
+    question: Question,
+    value: Answers[string],
+    setter: React.Dispatch<React.SetStateAction<Answers>>
+  ) {
+    switch (question.answerType as AnswerType) {
+      case "number":
+        return (
+          <input
+            id={question.field}
+            type="number"
+            step="0.01"
+            value={typeof value === "number" ? value : ""}
+            placeholder="Enter a number"
+            onChange={(event) =>
+              handleInputChange(
+                setter,
+                question,
+                event.target.value
+              )
+            }
+          />
+        );
+
+      case "select":
+        return (
+          <select
+            id={question.field}
+            value={typeof value === "string" ? value : ""}
+            onChange={(event) =>
+              handleInputChange(
+                setter,
+                question,
+                event.target.value
+              )
+            }
+          >
+            <option value="">Select an option</option>
+
+            {(question.options ?? []).map((option) => (
+              <option
+                key={option.value}
+                value={option.value}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
+
+      case "boolean":
+        return (
+          <select
+            id={question.field}
+            value={
+              typeof value === "boolean"
+                ? String(value)
+                : ""
+            }
+            onChange={(event) => {
+              if (event.target.value === "") {
+                updateAnswer(
+                  setter,
+                  question.field,
+                  null
+                );
+              } else {
+                updateAnswer(
+                  setter,
+                  question.field,
+                  event.target.value === "true"
+                );
+              }
+            }}
+          >
+            <option value="">Select an answer</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Phase 1 — General evaluation
+   * ------------------------------------------------------------
+   */
+
+  async function submitGeneral(event: FormEvent) {
     event.preventDefault();
-    // Replace the mock with Dev A's validated Verdict at integration time.
-    setReview(true);
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const response = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          generalAnswers: answers,
+        }),
+      });
+
+      const data: EvaluateResponse | { error?: string } =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          "error" in data && data.error
+            ? data.error
+            : "Evaluation failed"
+        );
+      }
+
+      const result = data as EvaluateResponse;
+
+      setVerdict(result);
+
+      /*
+       * General phase is incomplete.
+       * Stay on this page so the user can answer missing
+       * questions.
+       */
+      if (result.nextStep === "ANSWER_FOLLOW_UPS") {
+        return;
+      }
+
+      /*
+       * General phase passed.
+       * Now the user chooses a supported category.
+       */
+      if (result.nextStep === "CHOOSE_CATEGORY") {
+        setStep("category");
+        return;
+      }
+
+      /*
+       * In case the backend decides the process should stop
+       * immediately.
+       */
+      setStep("review");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong"
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
-  return (
-    <div className="shell">
-      <header><strong className="brand">Claim guide<span>.</span></strong><span>Hackathon prototype</span></header>
-      <main>
-        <p className="notice"><strong>Demo only.</strong> This shows a fixed sample result. It does not assess eligibility or submit a claim. Use fictional details.</p>
-        <ol className="steps" aria-label="Progress"><li aria-current={!review ? "step" : undefined}>01 &nbsp; Claim details</li><li aria-current={review ? "step" : undefined}>02 &nbsp; Review</li></ol>
-        {!review ? <div className="workspace">
-          <section className="panel" aria-labelledby="title">
-            <p className="eyebrow">SMALL CLAIMS · PRE-FILING</p>
-            <h1 id="title" ref={heading} tabIndex={-1}>Tell us about your claim</h1>
-            <p className="intro">Start with what happened and the information you have.</p>
-            <form onSubmit={submit}>
-              <label htmlFor="type">What is your claim about? <span>(required)</span></label>
-              <select id="type" required value={answers.claimType} onChange={(e) => update("claimType", e.target.value)}>
-                <option value="">Select a category</option><option>Goods or a purchase</option><option>A service</option><option>A tenancy</option><option>Other / I’m not sure</option>
-              </select>
-              <p className="hint">These intake categories do not confirm SCT coverage.</p>
-              <div className="row"><div><label htmlFor="amount">Amount claimed (SGD) <span>(optional)</span></label><input id="amount" type="number" min="0.01" step="0.01" placeholder="e.g. 250.00" value={answers.claimAmount} onChange={(e) => update("claimAmount", e.target.value)} /></div><div><label htmlFor="date">Date of incident <span>(optional)</span></label><input id="date" type="date" value={answers.incidentDate} onChange={(e) => update("incidentDate", e.target.value)} /></div></div>
-              <label htmlFor="description">What happened? <span>(required)</span></label><textarea id="description" required maxLength={3000} rows={4} placeholder="Describe what was agreed, what happened, and what you are asking for." value={answers.description} onChange={(e) => update("description", e.target.value)} />
-              <label htmlFor="evidence">What evidence do you have? <span>(optional)</span></label><textarea id="evidence" maxLength={3000} rows={3} placeholder="Describe any receipts, agreements, or messages you have." value={answers.evidence} onChange={(e) => update("evidence", e.target.value)} />
-              <p className="hint">Answers stay in this page’s memory. Refreshing clears them.</p><button type="submit">Preview result →</button>
+
+  /*
+   * ------------------------------------------------------------
+   * Load category-specific questions
+   * ------------------------------------------------------------
+   */
+
+  async function loadCategory(categoryId: string) {
+    setSelectedCategory(categoryId);
+    setCategoryConfig(null);
+    setCategoryAnswers({});
+    setError(null);
+
+    if (!categoryId) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        `/api/config/${encodeURIComponent(categoryId)}`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "Unable to load category"
+        );
+      }
+
+      setCategoryConfig(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load category"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Phase 2 — Category evaluation
+   * ------------------------------------------------------------
+   */
+
+  async function submitCategory(event: FormEvent) {
+    event.preventDefault();
+
+    if (!selectedCategory) {
+      setError("Please select a category.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const response = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          generalAnswers: answers,
+          categoryId: selectedCategory,
+          categoryAnswers,
+        }),
+      });
+
+      const data: EvaluateResponse | { error?: string } =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          "error" in data && data.error
+            ? data.error
+            : "Evaluation failed"
+        );
+      }
+
+      const result = data as EvaluateResponse;
+
+      setVerdict(result);
+
+      setStep("review");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Reset
+   * ------------------------------------------------------------
+   */
+
+  function startOver() {
+    setStep("general");
+    setAnswers({});
+    setCategoryAnswers({});
+    setSelectedCategory("");
+    setCategoryConfig(null);
+    setVerdict(null);
+    setError(null);
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Loading state
+   * ------------------------------------------------------------
+   */
+
+  if (loading && !config) {
+    return (
+      <main className="shell">
+        <div className="panel">
+          <p>Loading eligibility questions...</p>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Error state
+   * ------------------------------------------------------------
+   */
+
+  if (error && !config) {
+    return (
+      <main className="shell">
+        <div className="panel">
+          <h1>Unable to load the assessment</h1>
+          <p>{error}</p>
+          <button onClick={() => window.location.reload()}>
+            Try again
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * REVIEW
+   * ------------------------------------------------------------
+   */
+
+  if (step === "review" && verdict) {
+    return (
+      <main className="shell">
+        <header className="brand">
+          <strong>Claim guide</strong>
+          <span>Hackathon prototype</span>
+        </header>
+
+        <nav className="steps">
+          <span>01 Claim details</span>
+          <span className="active">02 Review</span>
+        </nav>
+
+        <section className="panel">
+          <p className="eyebrow">
+            YOUR REVIEW · ASSESSMENT RESULT
+          </p>
+
+          <h1>Review your claim</h1>
+
+          <div className="verdict">
+            <div className="badge">
+              {verdict.category
+                ? verdict.category.status
+                : verdict.general.status}
+            </div>
+
+            <h2>
+              {getStatusHeading(
+                verdict.category?.status ??
+                  verdict.general.status
+              )}
+            </h2>
+
+            <p>
+              {getStatusDescription(
+                verdict.category?.status ??
+                  verdict.general.status
+              )}
+            </p>
+          </div>
+
+          <ResultPhase
+            title="General eligibility"
+            phase={verdict.general}
+          />
+
+          {verdict.category && (
+            <ResultPhase
+              title="Category-specific eligibility"
+              phase={verdict.category}
+            />
+          )}
+
+          <div className="actions">
+            <button
+              className="secondary"
+              onClick={() => {
+                setStep(
+                  verdict.category
+                    ? "category"
+                    : "general"
+                );
+              }}
+            >
+              Edit answers
+            </button>
+
+            <button
+              className="secondary"
+              onClick={startOver}
+            >
+              Start over
+            </button>
+          </div>
+        </section>
+
+        <footer>
+          Independent student prototype · Not an official court service
+        </footer>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * CATEGORY STEP
+   * ------------------------------------------------------------
+   */
+
+  if (step === "category") {
+    return (
+      <main className="shell">
+        <header className="brand">
+          <strong>Claim guide</strong>
+          <span>Hackathon prototype</span>
+        </header>
+
+        <nav className="steps">
+          <span>01 General details</span>
+          <span className="active">
+            02 Claim category
+          </span>
+          <span>03 Review</span>
+        </nav>
+
+        <section className="panel">
+          <p className="eyebrow">
+            CLAIM CATEGORY · NEXT STEP
+          </p>
+
+          <h1>Tell us what your claim is about</h1>
+
+          <p className="intro">
+            Your general eligibility checks have cleared.
+            Now answer the questions specific to your claim.
+          </p>
+
+          {error && (
+            <div className="error">
+              {error}
+            </div>
+          )}
+
+          <div className="field">
+            <label htmlFor="category">
+              What is your claim about?
+            </label>
+
+            <select
+              id="category"
+              value={selectedCategory}
+              onChange={(event) =>
+                loadCategory(event.target.value)
+              }
+            >
+              <option value="">
+                Select a category
+              </option>
+
+              {(config?.categories ?? []).map(
+                (category) => (
+                  <option
+                    key={category.id}
+                    value={category.id}
+                  >
+                    {category.label}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          {selectedCategory && categoryConfig && (
+            <form onSubmit={submitCategory}>
+              {categoryConfig.questions.map(
+                (question) =>
+                  renderQuestion(
+                    question,
+                    categoryAnswers,
+                    setCategoryAnswers
+                  )
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+              >
+                {submitting
+                  ? "Checking..."
+                  : "Check eligibility →"}
+              </button>
             </form>
-          </section>
-          <aside><p className="eyebrow">BEFORE YOU BEGIN</p><h2>Start with the facts.</h2><p>Leave optional details blank if you don’t know them yet.</p><hr /><h3>Keep evidence separate</h3><p>Describe what each document shows, as well as what you believe happened.</p><h3>A guide, not a filing service</h3><p>This prototype does not send anything to the Small Claims Tribunals.</p></aside>
-        </div> : <section className="panel results" aria-labelledby="title">
-          <p className="eyebrow">YOUR REVIEW · SAMPLE OUTPUT</p><h1 id="title" ref={heading} tabIndex={-1}>Review your claim details</h1>
-          <div className="verdict"><span className="badge">Needs review · Demo</span><h2>{MOCK_VERDICT.plainExplanation}</h2><p>Every submission receives this mock verdict. Your answers have not been checked against legal rules.</p><dl><dt>Gate requiring attention</dt><dd>{MOCK_VERDICT.failedGate ?? "Not evaluated"}</dd><dt>Supporting provision</dt><dd>{MOCK_VERDICT.provision ?? "No legal source attached to this mock"}</dd></dl></div>
-          <h2>Your entered details</h2><dl className="summary">
-            <div><dt>Claim category</dt><dd>{answers.claimType}</dd></div><div><dt>Amount claimed</dt><dd>{answers.claimAmount ? `SGD ${Number(answers.claimAmount).toFixed(2)}` : "Not provided"}</dd></div><div><dt>Date of incident</dt><dd>{answers.incidentDate || "Not provided"}</dd></div><div><dt>What happened</dt><dd>{answers.description}</dd></div><div><dt>Evidence described</dt><dd>{answers.evidence || "Not provided"}</dd></div>
-          </dl><div className="actions"><button onClick={() => setReview(false)}>Edit answers</button><button className="secondary" onClick={() => { setAnswers(EMPTY); setReview(false); }}>Start over</button></div>
-        </section>}
-      </main><footer>Independent student prototype · Not an official court service</footer>
-    </div>
+          )}
+
+          {selectedCategory &&
+            !categoryConfig &&
+            !error && (
+              <p>Loading category questions...</p>
+            )}
+        </section>
+
+        <footer>
+          Independent student prototype · Not an official court service
+        </footer>
+      </main>
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * GENERAL STEP
+   * ------------------------------------------------------------
+   */
+
+  return (
+    <main className="shell">
+      <header className="brand">
+        <strong>Claim guide</strong>
+        <span>Hackathon prototype</span>
+      </header>
+
+      <nav className="steps">
+        <span className="active">
+          01 Claim details
+        </span>
+        <span>02 Claim category</span>
+        <span>03 Review</span>
+      </nav>
+
+      <div className="content-grid">
+        <section className="panel">
+          <p className="eyebrow">
+            SMALL CLAIMS · PRE-FILING
+          </p>
+
+          <h1>Tell us about your claim</h1>
+
+          <p className="intro">
+            Start with the facts. We will check your answers
+            against the published eligibility rules.
+          </p>
+
+          {error && (
+            <div className="error">
+              {error}
+            </div>
+          )}
+
+          {!config?.ready && (
+            <div className="warning">
+              Eligibility rules have not been published yet.
+            </div>
+          )}
+
+          <form onSubmit={submitGeneral}>
+            {(config?.generalQuestions ?? []).map(
+              (question) =>
+                renderQuestion(
+                  question,
+                  answers,
+                  setAnswers
+                )
+            )}
+
+            <button
+              type="submit"
+              disabled={
+                submitting || !config?.ready
+              }
+            >
+              {submitting
+                ? "Checking..."
+                : "Check eligibility →"}
+            </button>
+          </form>
+
+          {verdict?.general?.missing &&
+            verdict.general.missing.length > 0 && (
+              <div className="follow-ups">
+                <h3>More information needed</h3>
+
+                {verdict.general.missing.map(
+                  (result) => (
+                    <div
+                      key={result.gateId}
+                      className="follow-up"
+                    >
+                      <strong>
+                        {result.field}
+                      </strong>
+
+                      <p>
+                        {result.followUp ??
+                          result.explanation}
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+        </section>
+
+        <aside className="eyebrow-panel">
+          <p className="eyebrow">
+            BEFORE YOU BEGIN
+          </p>
+
+          <h2>Start with the facts.</h2>
+
+          <p>
+            Answer the questions as accurately as you can.
+            If you do not know something, you can leave it
+            unanswered.
+          </p>
+
+          <hr />
+
+          <h3>Eligibility, not legal advice</h3>
+
+          <p>
+            This prototype evaluates the information you
+            provide against the configured rules. It does
+            not decide whether your claim will succeed.
+          </p>
+
+          <hr />
+
+          <h3>A guide, not a filing service</h3>
+
+          <p>
+            This prototype does not submit anything to the
+            Small Claims Tribunals.
+          </p>
+        </aside>
+      </div>
+
+      <footer>
+        Independent student prototype · Not an official court service
+      </footer>
+    </main>
   );
+}
+
+/*
+ * ------------------------------------------------------------
+ * Result components
+ * ------------------------------------------------------------
+ */
+
+function ResultPhase({
+  title,
+  phase,
+}: {
+  title: string;
+  phase: EvaluateResponse["general"];
+}) {
+  return (
+    <section className="results">
+      <h2>{title}</h2>
+
+      <div className="status-row">
+        <strong>Status</strong>
+        <span>{phase.status}</span>
+      </div>
+
+      {phase.results.map((result) => (
+        <article
+          className="gate-result"
+          key={result.gateId}
+        >
+          <div className="gate-header">
+            <strong>{result.field}</strong>
+            <span>{result.outcome}</span>
+          </div>
+
+          <p>{result.explanation}</p>
+
+          {result.followUp && (
+            <p>
+              <strong>Follow-up:</strong>{" "}
+              {result.followUp}
+            </p>
+          )}
+
+          <div className="source">
+            <strong>Supporting provision</strong>
+
+            <p>
+              {result.source.title}
+              {result.source.provision
+                ? ` · ${result.source.provision}`
+                : ""}
+            </p>
+
+            {result.source.url && (
+              <a
+                href={result.source.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View source
+              </a>
+            )}
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+/*
+ * ------------------------------------------------------------
+ * Status helpers
+ * ------------------------------------------------------------
+ */
+
+function getStatusHeading(
+  status: EvaluateResponse["general"]["status"]
+) {
+  switch (status) {
+    case "PASS":
+      return "Your claim passed this eligibility check.";
+
+    case "CONDITIONAL":
+      return "Your claim may proceed subject to conditions.";
+
+    case "INCOMPLETE":
+      return "More information is needed.";
+
+    case "FAIL":
+      return "Your claim did not pass this eligibility check.";
+
+    default:
+      return "Assessment complete.";
+  }
+}
+
+function getStatusDescription(
+  status: EvaluateResponse["general"]["status"]
+) {
+  switch (status) {
+    case "PASS":
+      return "The configured eligibility rules did not identify a failed gate.";
+
+    case "CONDITIONAL":
+      return "One or more rules indicate that additional conditions may apply.";
+
+    case "INCOMPLETE":
+      return "One or more important questions still need an answer.";
+
+    case "FAIL":
+      return "One or more hard eligibility gates were not satisfied.";
+
+    default:
+      return "";
+  }
 }

@@ -21,3 +21,4 @@ export const MOCK_VERDICT: MockVerdict = {
   provision: null,
   plainExplanation: "Eligibility checking is not connected yet.",
 };
+
