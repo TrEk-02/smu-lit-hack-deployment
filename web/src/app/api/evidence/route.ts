@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return json<ApiError>({ error: "Invalid request", detail: parsed.error.flatten() }, 400);
   }
-  const { generalAnswers, categoryId, categoryAnswers, doc } = parsed.data;
+  const { generalAnswers, categoryId, categoryAnswers, docs } = parsed.data;
 
   // One flat view: gates are keyed by field, and a field is a field.
   const answers: Answers = { ...(categoryAnswers ?? {}), ...generalAnswers };
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
   const briefs = buildBriefs(gates, answers);
   let output;
   try {
-    output = await requestFindings(briefs, doc.pages);
+    output = await requestFindings(briefs, docs);
   } catch (error) {
     if (error instanceof LlmUnavailableError) {
       return json<ApiError>(
@@ -81,8 +81,11 @@ export async function POST(req: Request) {
   }
 
   // ---- 2. Quote verification --------------------------------------
-  const { kept, dropped } = verifyFindings(output.findings, doc.pages);
-  const ranked = rankFindings(kept.filter((finding) => allowedGateIds.has(finding.gateId)), passedGateIds);
+  const { kept, dropped } = verifyFindings(output.findings, docs);
+  const ranked = rankFindings(
+    kept.filter((finding) => allowedGateIds.has(finding.gateId)),
+    passedGateIds
+  );
 
   // ---- 3/4/5. Coerce, join, route ---------------------------------
   const findings: EvidenceFinding[] = [];
@@ -104,8 +107,12 @@ export async function POST(req: Request) {
       question: gate.question,
       kind: finding.kind,
       quote: finding.quote,
-      page: finding.verifiedPage,
-      observation: finding.observation,
+      docId: finding.location.docId,
+      docName: finding.location.docName,
+      page: finding.location.page,
+      // Document text is untrusted input. An injected screed cannot reach the
+      // claimant as a wall of text, and cannot claim more than one sentence.
+      observation: finding.observation.slice(0, MAX_OBSERVATION_CHARS),
       // A correction is only offered where legal allows one and the value survived coercion.
       proposedAnswer: escalate || !gate.evidence.correctable ? null : proposed,
       correctable: gate.evidence.correctable && !escalate,
@@ -119,7 +126,7 @@ export async function POST(req: Request) {
   const checkedGateIds = checked.map((entry) => entry.gateId);
 
   const body: EvidenceResponse = {
-    docId: doc.docId,
+    docIds: docs.map((entry) => entry.docId),
     findings,
     unclear: output.unclear
       .filter((item) => allowedGateIds.has(item.gateId))
@@ -137,6 +144,12 @@ export async function POST(req: Request) {
 
   return json<EvidenceResponse>(body);
 }
+
+/**
+ * Free model text rendered to the claimant is the one surface a hostile
+ * document can reach. Bounded, so it cannot become a payload.
+ */
+const MAX_OBSERVATION_CHARS = 400;
 
 /** Gate ids that currently PASS, so contradictions against them rank first. */
 function collectPassedGateIds(

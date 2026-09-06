@@ -385,6 +385,16 @@ they can just double down":
   everything — the round must still terminate and still produce a usable
   disagreement record.
 
+**[x] Done (2026-09-06).** The round now counts within its group, not across
+both: "THINGS THAT DON'T MATCH · 1 OF 1" then "THINGS WE STILL NEED · 1 OF 4".
+Each question states why it was asked — the queue was always ranked, but none of
+that was visible, which is what made it read as arbitrary. Copy per kind lives in
+`whyAsking()` in `challenge-panel.tsx`; the grouping predicate is `isMismatch()`
+in `challenge.ts` so the UI cannot drift from the ranking. Evidence page:
+contradictions expanded, corroborations collapsed behind "N things your documents
+back up". Reject-everything walked end to end — terminates, and the disagreement
+record survives with its quote and document name.
+
 ### F4. Demo fixtures — Scenario A and Scenario B (Ding Jie)
 
 - Live in **`src/config/scenarios.json`, not `rules.json`** — rules.json is
@@ -517,6 +527,18 @@ actions receive spacing from the preceding input.
   docId, page").
 - Cap the **bundle**, not the file: `MAX_CHARS` is 200k per document today, so
   five documents is 1M characters of prompt.
+
+**[x] Done (2026-09-06).** `MAX_DOCS = 5`, enforced server-side and stated in the
+UI ("Upload up to 5 PDFs"); `capBundle()` trims to `MAX_BUNDLE_CHARS = 200_000`
+across the whole bundle, in order, so an early document is never dropped for a
+later one.
+
+The model is **not** asked which document a quote came from — it cites a page,
+and `locateQuote()` searches every document and returns `{docId, docName, page}`
+from the actual match. Same principle as the page number: location is resolved by
+matching, never claimed by the model, so a wrong attribution is impossible rather
+than merely unlikely. Verified across a three-document bundle: findings resolved
+correctly to quotation.pdf and receipt.pdf, zero drops.
 
 ### F8. Cleanup
 

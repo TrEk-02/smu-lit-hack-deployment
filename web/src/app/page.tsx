@@ -548,6 +548,7 @@ export default function Home() {
               claimantAnswer: question.currentAnswerLabel,
               observation: question.evidence!.observation,
               quote: question.evidence!.quote,
+              docName: question.evidence!.docName,
               page: question.evidence!.page,
               reason: question.kind === "ESCALATED" ? "ESCALATED" : "REJECTED",
             },
@@ -1197,7 +1198,9 @@ function DisagreementSummary({ disagreements }: { disagreements: Disagreement[] 
 
           <blockquote className="quote">
             “{item.quote}”
-            <cite>your document, page {item.page}</cite>
+            <cite>
+              {item.docName || "your document"}, page {item.page}
+            </cite>
           </blockquote>
         </article>
       ))}

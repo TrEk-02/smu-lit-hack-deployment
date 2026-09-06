@@ -84,7 +84,8 @@ export const EvidenceRequestSchema = z.object({
   generalAnswers: AnswersSchema,
   categoryId: z.string().min(1).optional(),
   categoryAnswers: AnswersSchema.optional(),
-  doc: ExtractedDocSchema,
+  /** Up to five documents; the verifier resolves which one a quote came from. */
+  docs: z.array(ExtractedDocSchema).min(1).max(5),
 });
 export type EvidenceRequest = z.infer<typeof EvidenceRequestSchema>;
 
@@ -97,8 +98,11 @@ export type EvidenceFinding = {
   field: string;
   question: string;
   kind: "CORROBORATES" | "CONTRADICTS";
-  /** Verified to appear verbatim in the document; unmatched quotes never reach here. */
+  /** Verified to appear verbatim in a document; unmatched quotes never reach here. */
   quote: string;
+  /** Resolved by matching, not claimed by the model. */
+  docId: string;
+  docName: string;
   page: number;
   observation: string;
   /** Coerced to the gate's answerType, or null if it would not coerce. */
@@ -111,7 +115,7 @@ export type EvidenceFinding = {
 };
 
 export type EvidenceResponse = {
-  docId: string;
+  docIds: string[];
   findings: EvidenceFinding[];
   unclear: { gateId: string; question: string; why: string }[];
   provenance: Record<string, Provenance>;
@@ -140,6 +144,7 @@ const FindingInputSchema = z.object({
   proposedAnswer: z.union([z.string(), z.number(), z.boolean()]).nullable(),
   correctable: z.boolean(),
   escalate: z.boolean(),
+  docName: z.string().default(""),
 });
 
 export const ChallengeRequestSchema = z.object({
@@ -169,6 +174,7 @@ export type Disagreement = {
   /** Why the document disagrees, with its verified quote. */
   observation: string;
   quote: string;
+  docName: string;
   page: number;
   reason: "REJECTED" | "ESCALATED";
 };

@@ -10,6 +10,8 @@ type ExtractedDoc = {
   pages: { page: number; text: string }[];
 };
 
+const MAX_DOCS = 5;
+
 type Props = {
   generalAnswers: Answers;
   categoryId: string;
@@ -24,11 +26,14 @@ type Props = {
 
 /*
  * ------------------------------------------------------------
- * Evidence layer (Sprint 2, Feature 2)
+ * Evidence layer (Sprint 2 Feature 2; Sprint 3 F3 + F7)
  *
  * Two steps, deliberately separate: ingest shows the claimant
  * exactly what text was read before anything is sent to a model,
  * then the check compares that text against their own answers.
+ *
+ * Contradictions lead; corroborations are collapsed behind them.
+ * Agreeing with the claimant is reassurance, never the headline.
  *
  * Nothing here writes a verdict. Findings are proposals.
  * ------------------------------------------------------------
@@ -44,7 +49,7 @@ export default function EvidencePanel({
   onBack,
 }: Props) {
   const [pasted, setPasted] = useState("");
-  const [doc, setDoc] = useState<ExtractedDoc | null>(null);
+  const [docs, setDocs] = useState<ExtractedDoc[]>([]);
 
   const [reading, setReading] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -60,19 +65,23 @@ export default function EvidencePanel({
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error ?? "That document could not be read.");
-      setDoc(data as ExtractedDoc);
+      setDocs(data.docs as ExtractedDoc[]);
     } catch (err) {
-      setDoc(null);
+      setDocs([]);
       setError(err instanceof Error ? err.message : "That document could not be read.");
     } finally {
       setReading(false);
     }
   }
 
-  function onFile(file: File | undefined) {
-    if (!file) return;
+  function onFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    if (files.length > MAX_DOCS) {
+      setError(`You can upload up to ${MAX_DOCS} documents at a time. You selected ${files.length}.`);
+      return;
+    }
     const body = new FormData();
-    body.append("file", file);
+    for (const file of Array.from(files)) body.append("file", file);
     ingest(body);
   }
 
@@ -87,7 +96,7 @@ export default function EvidencePanel({
   }
 
   async function check() {
-    if (!doc) return;
+    if (docs.length === 0) return;
 
     try {
       setChecking(true);
@@ -96,20 +105,22 @@ export default function EvidencePanel({
       const response = await fetch("/api/evidence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generalAnswers, categoryId, categoryAnswers, doc }),
+        body: JSON.stringify({ generalAnswers, categoryId, categoryAnswers, docs }),
       });
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error ?? "Your document could not be checked.");
+      if (!response.ok) throw new Error(data.error ?? "Your documents could not be checked.");
       onResult(data as EvidenceResponse);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Your document could not be checked.");
+      setError(err instanceof Error ? err.message : "Your documents could not be checked.");
     } finally {
       setChecking(false);
     }
   }
 
   const contradictions = result?.findings.filter((f) => f.kind === "CONTRADICTS") ?? [];
+  const corroborations = result?.findings.filter((f) => f.kind === "CORROBORATES") ?? [];
+  const pageCount = docs.reduce((total, doc) => total + doc.pages.length, 0);
 
   return (
     <section className="panel">
@@ -118,7 +129,7 @@ export default function EvidencePanel({
       <h1>Do your documents agree with you?</h1>
 
       <p className="intro">
-        Your answers so far are your own account. This checks them against a document —
+        Your answers so far are your own account. This checks them against your documents —
         and tells you where the two do not match. Nothing here changes your eligibility
         result.
       </p>
@@ -127,17 +138,19 @@ export default function EvidencePanel({
 
       {/* ---- Step 1: get the text ---- */}
       <div className="field">
-        <label htmlFor="evidence-file">Upload a PDF</label>
+        <label htmlFor="evidence-file">Upload up to {MAX_DOCS} PDFs</label>
         <input
           id="evidence-file"
           type="file"
           accept="application/pdf"
+          multiple
           disabled={reading}
-          onChange={(event) => onFile(event.target.files?.[0])}
+          onChange={(event) => onFiles(event.target.files)}
         />
         <p className="hint">
-          Text-based PDFs only — a scan or a photo has no text to read. Your file is not
-          stored: the text is extracted and the file is discarded.
+          Text-based PDFs only — a scan or a photo has no text to read. Select all of them
+          at once. Your files are not stored: the text is extracted and the files are
+          discarded.
         </p>
       </div>
 
@@ -156,31 +169,35 @@ export default function EvidencePanel({
       </div>
 
       {/* ---- Step 2: show what we read, then check it ---- */}
-      {doc && (
+      {docs.length > 0 && (
         <div className="results">
           <h2>What we read</h2>
 
-          <div className="status-row">
-            <strong>{doc.name}</strong>
-            <span>
-              {doc.pages.length} page{doc.pages.length === 1 ? "" : "s"} of text
-            </span>
-          </div>
+          {docs.map((doc) => (
+            <div className="status-row" key={doc.docId}>
+              <strong>{doc.name}</strong>
+              <span>
+                {doc.pages.length} page{doc.pages.length === 1 ? "" : "s"} of text
+              </span>
+            </div>
+          ))}
 
           <p className="hint">
-            This text — and nothing else about your claim — is what gets checked.
+            This text — {pageCount} page{pageCount === 1 ? "" : "s"} across{" "}
+            {docs.length} document{docs.length === 1 ? "" : "s"}, and nothing else about
+            your claim — is what gets checked.
           </p>
 
           <button type="button" disabled={checking} onClick={check}>
-            {checking ? "Checking your document…" : "Check against my answers →"}
+            {checking ? "Checking your documents…" : "Check against my answers →"}
           </button>
         </div>
       )}
 
-      {/* ---- Step 3: findings ---- */}
+      {/* ---- Step 3: findings, contradictions first ---- */}
       {result && (
         <div className="results">
-          <h2>What your document shows</h2>
+          <h2>What your documents show</h2>
 
           {result.stubbed && (
             <div className="warning">
@@ -191,28 +208,41 @@ export default function EvidencePanel({
           <p className="intro">
             {contradictions.length > 0
               ? `${contradictions.length} thing${contradictions.length === 1 ? " does" : "s do"} not match what you told us.`
-              : "Nothing in this document contradicts your answers."}
+              : "Nothing in your documents contradicts your answers."}
           </p>
 
           {result.droppedFindings > 0 && (
             <div className="notice">
               {result.droppedFindings} suggested finding
               {result.droppedFindings === 1 ? " was" : "s were"} discarded because the
-              quoted words could not be found in your document.
+              quoted words could not be found in your documents.
             </div>
           )}
 
           {result.findings.length === 0 && (
             <p>
-              We could not verify anything in this document against your answers. That is
+              We could not verify anything in these documents against your answers. That is
               not the same as your answers being right — try a document that speaks
               directly to the points above.
             </p>
           )}
 
-          {result.findings.map((finding) => (
+          {contradictions.map((finding) => (
             <FindingCard key={`${finding.gateId}-${finding.quote}`} finding={finding} />
           ))}
+
+          {/* Reassurance, collapsed: it should never outweigh the mismatches. */}
+          {corroborations.length > 0 && (
+            <details className="collapsible">
+              <summary>
+                {corroborations.length} thing{corroborations.length === 1 ? "" : "s"} your
+                documents back up
+              </summary>
+              {corroborations.map((finding) => (
+                <FindingCard key={`${finding.gateId}-${finding.quote}`} finding={finding} />
+              ))}
+            </details>
+          )}
 
           {result.unclear.length > 0 && (
             <div className="follow-ups">
@@ -263,7 +293,9 @@ function FindingCard({ finding }: { finding: EvidenceFinding }) {
       {/* No quote, no finding — it was dropped at verification. */}
       <blockquote className="quote">
         “{finding.quote}”
-        <cite>your document, page {finding.page}</cite>
+        <cite>
+          {finding.docName}, page {finding.page}
+        </cite>
       </blockquote>
 
       {finding.proposedAnswer !== null && (

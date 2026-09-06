@@ -1,6 +1,6 @@
 import { LlmOutputSchema, wireSchema, type LlmOutput } from "./schema";
 import { SYSTEM_PROMPT, buildUserPrompt, type GateBrief } from "./prompt";
-import type { Page } from "./verify";
+import type { SourceDoc } from "./verify";
 
 /* ============================================================
  * OPENROUTER TRANSPORT
@@ -39,8 +39,8 @@ export function isStubbed(): boolean {
  * Fabricating a quote here would make the stub demo show nothing,
  * because verification would correctly drop it.
  */
-function stubOutput(briefs: GateBrief[], pages: Page[]): LlmOutput {
-  const firstPage = pages.find((page) => page.text.trim().length > 0);
+function stubOutput(briefs: GateBrief[], docs: SourceDoc[]): LlmOutput {
+  const firstPage = docs.flatMap((doc) => doc.pages).find((page) => page.text.trim().length > 0);
   const target = briefs[0];
   if (!firstPage || !target) return { findings: [], unclear: [] };
 
@@ -53,18 +53,18 @@ function stubOutput(briefs: GateBrief[], pages: Page[]): LlmOutput {
         kind: "CONTRADICTS",
         quote,
         page: firstPage.page,
-        observation: `[demo fixture] This document does not appear to match your answer to "${target.question}".`,
+        observation: `This document does not appear to match your answer to "${target.question}".`,
         proposedAnswer: null,
       },
     ],
     unclear: briefs[1]
-      ? [{ gateId: briefs[1].id, why: "[demo fixture] The document is ambiguous on this point." }]
+      ? [{ gateId: briefs[1].id, why: "The document is ambiguous on this point." }]
       : [],
   };
 }
 
-export async function requestFindings(briefs: GateBrief[], pages: Page[]): Promise<LlmOutput> {
-  if (isStubbed()) return stubOutput(briefs, pages);
+export async function requestFindings(briefs: GateBrief[], docs: SourceDoc[]): Promise<LlmOutput> {
+  if (isStubbed()) return stubOutput(briefs, docs);
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new LlmUnavailableError("OPENROUTER_API_KEY is not set");
@@ -87,7 +87,7 @@ export async function requestFindings(briefs: GateBrief[], pages: Page[]): Promi
         reasoning: { effort: REASONING_EFFORT },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(briefs, pages) },
+          { role: "user", content: buildUserPrompt(briefs, docs) },
         ],
         response_format: {
           type: "json_schema",

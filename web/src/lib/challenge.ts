@@ -47,7 +47,7 @@ export type ChallengeQuestion = {
   proposedAnswer: AnswerValue | null;
   proposedAnswerLabel: string | null;
   /** Present only where a document drove the question. No quote, no question. */
-  evidence: { quote: string; page: number; observation: string } | null;
+  evidence: { quote: string; docName: string; page: number; observation: string } | null;
   explanation: string;
   source: Source;
 };
@@ -66,6 +66,7 @@ export type FindingLike = {
   proposedAnswer: AnswerValue | null;
   correctable: boolean;
   escalate: boolean;
+  docName: string;
 };
 
 /** The gate fields the builder needs. `PublishedGate` satisfies it. */
@@ -106,6 +107,15 @@ export type BuildInput = {
 function contradictionPriority(finding: FindingLike, passed: Set<string>): number {
   if (!passed.has(finding.gateId)) return 2;
   return finding.escalate ? 1 : 0;
+}
+
+/**
+ * Two different products, and mixing them dilutes both: a document
+ * contradicting the claimant is the point of the tool; an unanswered gate is
+ * form-filling. The round presents them as separate groups (DECISIONS.md F3).
+ */
+export function isMismatch(kind: ChallengeKind): boolean {
+  return kind === "CONFIRM_CORRECTION" || kind === "ESCALATED";
 }
 
 export function buildQuestions(
@@ -155,6 +165,7 @@ export function buildQuestions(
           : formatAnswer(finding.proposedAnswer, gate.answerType, gate.options),
       evidence: {
         quote: finding.quote,
+        docName: finding.docName,
         page: finding.page,
         observation: finding.observation,
       },

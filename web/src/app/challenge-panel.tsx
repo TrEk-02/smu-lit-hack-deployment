@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnswerInput } from "./answer-input";
-import type { ChallengeQuestion } from "@/lib/challenge";
+import { isMismatch, type ChallengeQuestion } from "@/lib/challenge";
 import type { Answers, AnswerValue } from "@/lib/types";
 import { applicability } from "@/lib/applicability";
 
@@ -75,7 +75,8 @@ export default function ChallengePanel({ generalAnswers, categoryAnswers, questi
         <p className="intro">
           Your answers have been re-checked against the eligibility rules. Where you
           stood by an answer we disagreed with, we have kept your answer and noted the
-          disagreement for whoever looks at this next.
+          disagreement for whoever looks at this next — your account and your document
+          both stay on the record.
         </p>
         <p className="hint">If a correction introduced a new eligibility question, use Edit answers on your review to complete it.</p>
         <div className="actions">
@@ -93,6 +94,10 @@ export default function ChallengePanel({ generalAnswers, categoryAnswers, questi
 
       <h1>{headline(question)}</h1>
 
+      {/* The ranking is deliberate, so say so. Without this the round reads as
+          arbitrary, which is the fastest way to lose the point of it. */}
+      <p className="intro">{whyAsking(question)}</p>
+
       {verdictBanner}
 
       <article className="gate-result">
@@ -107,7 +112,9 @@ export default function ChallengePanel({ generalAnswers, categoryAnswers, questi
             <p>{question.evidence.observation}</p>
             <blockquote className="quote">
               “{question.evidence.quote}”
-              <cite>your document, page {question.evidence.page}</cite>
+              <cite>
+                {question.evidence.docName || "your document"}, page {question.evidence.page}
+              </cite>
             </blockquote>
           </>
         )}
@@ -212,6 +219,29 @@ export default function ChallengePanel({ generalAnswers, categoryAnswers, questi
         </div>
       </>
     );
+  }
+}
+
+/** Which of the two groups this question belongs to. */
+function groupLabel(question: ChallengeQuestion): string {
+  return isMismatch(question.kind) ? "THINGS THAT DON'T MATCH" : "THINGS WE STILL NEED";
+}
+
+/**
+ * Why this question, in the claimant's terms. The queue is ranked — a
+ * contradiction on an answer they passed outranks a blank field — but none of
+ * that is visible unless we say it.
+ */
+function whyAsking(question: ChallengeQuestion): string {
+  switch (question.kind) {
+    case "CONFIRM_CORRECTION":
+      return "We are asking because one of your own documents appears to disagree with what you told us — and you are the only person who can say which is right.";
+    case "ESCALATED":
+      return "We are asking because your document points the other way, but deciding this needs judgement we are not going to make for you.";
+    case "UNCLEAR":
+      return "We are asking because your document seemed to touch on this, but not clearly enough for us to tell either way.";
+    case "FOLLOW_UP":
+      return "We are asking because this part of your claim is still thin or unanswered — it is not a mark against you.";
   }
 }
 

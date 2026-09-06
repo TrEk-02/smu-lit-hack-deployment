@@ -66,6 +66,10 @@ dt { font-weight: 700; font-size: 14px; }dd { margin: 0; overflow-wrap: anywhere
 .quote cite { display: block; margin-top: 7px; font-style: normal; font-size: 13px; color: #536477; }
 .source { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e1e7ee; font-size: 13px; color: #536477; }
 .source p { margin: 4px 0 0; }
+.collapsible { margin: 18px 0; border: 1px solid #dce3ec; border-radius: 10px; background: #fbfcfe; }
+.collapsible > summary { cursor: pointer; padding: 14px 18px; font-size: 14px; font-weight: 700; color: #14532d; }
+.collapsible > summary:hover { background: #f1f6fa; }
+.collapsible .gate-result { margin: 0 14px 14px; }
 .follow-ups { margin-top: 24px; }
 .follow-up { padding: 12px 0; border-bottom: 1px solid #e1e7ee; font-size: 14px; }
 .follow-up p { margin: 5px 0 0; color: #536477; }

@@ -42,6 +42,7 @@ function finding(gateId: string, over: Partial<FindingLike> = {}): FindingLike {
     proposedAnswer: false,
     correctable: true,
     escalate: false,
+    docName: "invoice.pdf",
     ...over,
   };
 }
@@ -154,6 +155,7 @@ test("every document-driven question carries its verified quote", () => {
   assert.equal(fromDocument.length, 1);
   assert.equal(fromDocument[0].evidence?.quote, "the agreed price was S$8,900");
   assert.equal(fromDocument[0].evidence?.page, 1);
+  assert.equal(fromDocument[0].evidence?.docName, "invoice.pdf", "the claimant is told which document");
 });
 
 test("corroborations never become questions", () => {
