@@ -66,8 +66,13 @@ export async function POST(req: Request) {
     output = await requestFindings(briefs, docs);
   } catch (error) {
     if (error instanceof LlmUnavailableError) {
+      // Unreachable, timed out, or refused for credit/key reasons. We do not
+      // know which from here, so the copy does not claim a cause — saying
+      // "not configured" when the service merely timed out is a lie to the
+      // claimant, and DECISIONS.md §F8 asks these two be distinguishable.
+      console.error("[evidence] LLM unavailable:", error.message);
       return json<ApiError>(
-        { error: "Document checking is not configured, so your document was not assessed." },
+        { error: "Document checking could not be reached, so your document was not assessed. Your answers and your eligibility result are unaffected." },
         503
       );
     }

@@ -1,46 +1,44 @@
 # POST /api/evaluate
 
-General eligibility endpoint only. Uses the existing provisional GeneralAnswers
-schema; legal still needs to confirm the questions. No legal rules are invented here.
+Both eligibility phases, one stateless endpoint. The UI calls it twice: once
+with general answers alone, then again with the same general answers plus the
+category step. No session, no database — refresh resets everything
+(DECISIONS.md §12).
 
-Send JSON directly (not wrapped in an `answers` property):
+## Request
 
 ```json
 {
-  "claimAmount": 250,
-  "respondentType": "business",
-  "causeOfActionDate": "2026-08-01",
-  "hasAttemptedMediation": false,
-  "isRespondentInSingapore": true
+  "generalAnswers": { "claimAmount": 3000, "withinTwoYears": true },
+  "categoryId": "BREACH_OF_CONTRACT",
+  "categoryAnswers": { "proofOfAgreement": "written" }
 }
 ```
 
-- Amount must be a positive number, not a string.
-- Respondent type: `individual`, `business`
-- Date must be a valid ISO date (`YYYY-MM-DD`). This validates format, not legal accrual.
-- Both yes/no answers must be booleans. Missing answers are rejected, not assumed false.
-- `200`: GeneralVerdict (`overallStatus` and `gateResults`), validated before sending.
-- `400 INVALID_JSON`: malformed JSON.
-- `400 INVALID_ANSWERS`: invalid/missing fields; `issues` lists field paths and messages.
-- `503 RULES_UNAVAILABLE`: rule configuration cannot load/validate (current draft state).
-- `503 EVALUATOR_UNAVAILABLE`: evaluator still throws its placeholder error.
-- `500`: unexpected evaluator failure or invalid verdict; no internal details exposed.
+`categoryId` and `categoryAnswers` are optional and are only read once the
+general phase clears. Answer keys are the `field` values in
+`src/config/rules.json` — they are not hardcoded here, so adding a gate to
+that file is enough to make its answer meaningful.
 
-Frontend integration:
+## Responses
 
-```ts
-const response = await fetch("/api/evaluate", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(answers),
-});
-const result = await response.json();
-if (!response.ok) {
-  // Show result.error and result.issues, preserving the user's answers.
-  return;
-}
-// Render result.overallStatus and result.gateResults.
-```
+- `200` — `EvaluateResponse`: `general`, optionally `category`, and
+  `nextStep` (`STOP` | `ANSWER_FOLLOW_UPS` | `CHOOSE_CATEGORY` | `COMPLETE`).
+  `nextStep` exists so the client does not re-derive routing logic.
+- `400` — body was not valid JSON, failed `EvaluateRequestSchema`, or named an
+  unsupported category.
+- `503` — no general gates are published. Refusing beats returning a verdict
+  from an empty rule set.
 
-The current mock UI is unchanged. Dev A must align the rules JSON with RulesFileSchema
-and implement evaluateGeneral before this endpoint can return a real verdict.
+`GateResult` deliberately excludes `gate.description` (legal's internal notes),
+`gate.operator` and `gate.value` (the answer key). `strip()` in `route.ts` is
+where to re-narrow if `GateResult` is ever widened.
+
+## Notes
+
+- Missing or wrong-typed answers produce `MISSING` / `INCOMPLETE`. They never
+  silently pass.
+- The category phase does not run while the general phase is `FAIL` or
+  `INCOMPLETE`.
+- No LLM is involved. This endpoint is fully deterministic; document checking
+  lives in `POST /api/evidence`.
