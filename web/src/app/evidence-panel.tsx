@@ -8,9 +8,11 @@ type ExtractedDoc = {
   docId: string;
   name: string;
   pages: { page: number; text: string }[];
+  origin: "pdf" | "text" | "image";
 };
 
 const MAX_DOCS = 5;
+const ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
 
 type Props = {
   generalAnswers: Answers;
@@ -52,12 +54,15 @@ export default function EvidencePanel({
   const [docs, setDocs] = useState<ExtractedDoc[]>([]);
 
   const [reading, setReading] = useState(false);
+  /** Names of what is currently being read, so the wait has something to say. */
+  const [readingNames, setReadingNames] = useState<string[]>([]);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function ingest(body: FormData) {
+  async function ingest(body: FormData, names: string[] = []) {
     try {
       setReading(true);
+      setReadingNames(names);
       setError(null);
       onResult(null);
 
@@ -71,6 +76,7 @@ export default function EvidencePanel({
       setError(err instanceof Error ? err.message : "That document could not be read.");
     } finally {
       setReading(false);
+      setReadingNames([]);
     }
   }
 
@@ -80,9 +86,10 @@ export default function EvidencePanel({
       setError(`You can upload up to ${MAX_DOCS} documents at a time. You selected ${files.length}.`);
       return;
     }
+    const chosen = Array.from(files);
     const body = new FormData();
-    for (const file of Array.from(files)) body.append("file", file);
-    ingest(body);
+    for (const file of chosen) body.append("file", file);
+    ingest(body, chosen.map((file) => file.name));
   }
 
   function onPaste() {
@@ -136,21 +143,47 @@ export default function EvidencePanel({
 
       {error && <div className="error">{error}</div>}
 
+      {/*
+        Reading a document with no text layer means a model call of several
+        seconds per file, and before this there was nothing on screen saying so
+        — the page simply sat there. Silence during a slow step reads as a
+        crash, and a claimant who reloads pays for the work twice.
+      */}
+      {reading && (
+        <div className="notice" role="status" aria-live="polite">
+          <strong>Reading{readingNames.length > 0 ? ` ${readingNames.length} file${readingNames.length === 1 ? "" : "s"}` : ""}…</strong>
+          {readingNames.length > 0 && <p>{readingNames.join(", ")}</p>}
+          <p>
+            A PDF with text in it is read instantly. A screenshot, or a PDF that
+            is really a picture, has to have its words read off the page — that
+            takes a few seconds per file. They are read at the same time, not
+            one after another.
+          </p>
+        </div>
+      )}
+
       {/* ---- Step 1: get the text ---- */}
       <div className="field">
-        <label htmlFor="evidence-file">Upload up to {MAX_DOCS} PDFs</label>
+        <label htmlFor="evidence-file">
+          Upload up to {MAX_DOCS} documents or screenshots
+        </label>
         <input
           id="evidence-file"
           type="file"
-          accept="application/pdf"
+          accept={ACCEPT}
           multiple
           disabled={reading}
           onChange={(event) => onFiles(event.target.files)}
         />
         <p className="hint">
-          Text-based PDFs only — a scan or a photo has no text to read. Select all of them
-          at once. Your files are not stored: the text is extracted and the files are
-          discarded.
+          Text-based PDFs, or screenshots of a chat (PNG, JPEG or WebP) — a WhatsApp
+          thread is fine. Select all of them at once. Your files are not stored: the
+          text is read out and the files are discarded.
+        </p>
+        <p className="hint">
+          A screenshot has no text in it, so we read the words off the picture. That is
+          a reading, not an extraction — we show you exactly what we read below, and you
+          should check it before we use it.
         </p>
       </div>
 
@@ -174,11 +207,32 @@ export default function EvidencePanel({
           <h2>What we read</h2>
 
           {docs.map((doc) => (
-            <div className="status-row" key={doc.docId}>
-              <strong>{doc.name}</strong>
-              <span>
-                {doc.pages.length} page{doc.pages.length === 1 ? "" : "s"} of text
-              </span>
+            <div key={doc.docId}>
+              <div className="status-row">
+                <strong>{doc.name}</strong>
+                <span>
+                  {doc.origin === "image"
+                    ? "read from a screenshot"
+                    : `${doc.pages.length} page${doc.pages.length === 1 ? "" : "s"} of text`}
+                </span>
+              </div>
+
+              {/*
+                A transcript is the one kind of document text we produced rather
+                than extracted, so it is the one the claimant has to be able to
+                check. Showing it also makes a misread visible instead of silent.
+              */}
+              {doc.origin === "image" && (
+                <details className="collapsible">
+                  <summary>What we read from {doc.name} — check this</summary>
+                  <pre className="transcript">{doc.pages[0]?.text}</pre>
+                  <p className="hint">
+                    If this is wrong, remove the screenshot and paste the messages as
+                    text instead. We check findings against these words, so a misreading
+                    here carries through.
+                  </p>
+                </details>
+              )}
             </div>
           ))}
 
@@ -187,6 +241,16 @@ export default function EvidencePanel({
             {docs.length} document{docs.length === 1 ? "" : "s"}, and nothing else about
             your claim — is what gets checked.
           </p>
+
+          {checking && (
+            <div className="notice" role="status" aria-live="polite">
+              <strong>Checking your documents against your answers…</strong>
+              <p>
+                This one takes about ten seconds. Every quote we come back with is
+                checked against the text above before you see it.
+              </p>
+            </div>
+          )}
 
           <button type="button" disabled={checking} onClick={check}>
             {checking ? "Checking your documents…" : "Check against my answers →"}
@@ -294,7 +358,9 @@ function FindingCard({ finding }: { finding: EvidenceFinding }) {
       <blockquote className="quote">
         “{finding.quote}”
         <cite>
-          {finding.docName}, page {finding.page}
+          {finding.origin === "image"
+            ? `${finding.docName} — read from a screenshot`
+            : `${finding.docName}, page ${finding.page}`}
         </cite>
       </blockquote>
 

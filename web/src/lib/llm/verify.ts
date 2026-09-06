@@ -20,11 +20,20 @@ import type { Finding } from "./schema";
 
 export type Page = { page: number; text: string };
 
+/**
+ * How a document's text was obtained. "pdf" and "text" are mechanical — the
+ * words came off the file. "image" was transcribed from a picture by a model
+ * that was shown the image and nothing else, which is a reading rather than an
+ * extraction, and is labelled as such everywhere a quote is displayed.
+ */
+export type DocOrigin = "pdf" | "text" | "image";
+
 /** One ingested document: what the verifier searches. */
 export type SourceDoc = {
   docId: string;
   name: string;
   pages: Page[];
+  origin?: DocOrigin;
 };
 
 /** Where a quote really is. Resolved by matching, never trusted from the model. */
@@ -32,6 +41,8 @@ export type QuoteLocation = {
   docId: string;
   docName: string;
   page: number;
+  /** Travels with the quote so the UI never shows a transcript as a document. */
+  origin: DocOrigin;
 };
 
 /**
@@ -63,7 +74,12 @@ export function locateQuote(quote: string, docs: SourceDoc[]): QuoteLocation | n
   for (const doc of docs) {
     for (const page of doc.pages) {
       if (normalise(page.text).includes(needle)) {
-        return { docId: doc.docId, docName: doc.name, page: page.page };
+        return {
+          docId: doc.docId,
+          docName: doc.name,
+          page: page.page,
+          origin: doc.origin ?? "pdf",
+        };
       }
     }
   }

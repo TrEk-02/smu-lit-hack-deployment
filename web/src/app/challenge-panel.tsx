@@ -113,7 +113,9 @@ export default function ChallengePanel({ generalAnswers, categoryAnswers, questi
             <blockquote className="quote">
               “{question.evidence.quote}”
               <cite>
-                {question.evidence.docName || "your document"}, page {question.evidence.page}
+                {question.evidence.origin === "image"
+                  ? `${question.evidence.docName || "your screenshot"} — read from a screenshot`
+                  : `${question.evidence.docName || "your document"}, page ${question.evidence.page}`}
               </cite>
             </blockquote>
           </>

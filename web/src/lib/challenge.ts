@@ -3,6 +3,7 @@
 // Type-only imports are erased, so they don't.
 import { formatAnswer } from "./format.ts";
 import type { AnswerType, AnswerValue, Answers, ApplicabilityCondition, Option, Source } from "./types";
+import type { DocOrigin } from "./llm/verify";
 
 /* ============================================================
  * THE CHALLENGE ROUND — question builder
@@ -47,7 +48,13 @@ export type ChallengeQuestion = {
   proposedAnswer: AnswerValue | null;
   proposedAnswerLabel: string | null;
   /** Present only where a document drove the question. No quote, no question. */
-  evidence: { quote: string; docName: string; page: number; observation: string } | null;
+  evidence: {
+    quote: string;
+    docName: string;
+    page: number;
+    observation: string;
+    origin: DocOrigin;
+  } | null;
   explanation: string;
   source: Source;
 };
@@ -67,6 +74,7 @@ export type FindingLike = {
   correctable: boolean;
   escalate: boolean;
   docName: string;
+  origin: DocOrigin;
 };
 
 /** The gate fields the builder needs. `PublishedGate` satisfies it. */
@@ -168,6 +176,7 @@ export function buildQuestions(
         docName: finding.docName,
         page: finding.page,
         observation: finding.observation,
+        origin: finding.origin,
       },
     });
   }

@@ -76,3 +76,32 @@ dt { font-weight: 700; font-size: 14px; }dd { margin: 0; overflow-wrap: anywhere
 .secondary { color: #153a59; background: white; border-color: #aab8c7; }.secondary:hover { background: #eef3f8; }
 @media (max-width: 800px) { .workspace { grid-template-columns: 1fr; } aside { padding: 0 8px; } }
 @media (max-width: 520px) { .shell { padding: 0 16px; } .panel { padding: 23px 18px; } .row { grid-template-columns: 1fr; gap: 0; } .summary > div { grid-template-columns: 1fr; gap: 4px; } header > span { max-width: 100px; text-align: right; } .steps { gap: 22px; } }
+
+/*
+ * Print — the handoff notes are meant to leave the browser, so printing
+ * has to produce the notes rather than a screenshot of the app. Drops the
+ * chrome and the controls; keeps the record.
+ */
+@media print {
+  .steps, .actions, .demo-scenarios, button { display: none !important; }
+  .panel { border: none; padding: 0; }
+  .shell { max-width: none; padding: 0; }
+  .gate-result, .quote, .summary > div { break-inside: avoid; }
+  .quote { background: none; border-left: 3px solid #666; }
+}
+
+/* A transcript is quoted text, not prose — keep the line breaks that carry
+   who said what, and let a long thread scroll rather than stretch the page. */
+.transcript {
+  margin: 0 14px 14px;
+  padding: 14px 16px;
+  background: #f1f6fa;
+  border-left: 3px solid #45708e;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+}

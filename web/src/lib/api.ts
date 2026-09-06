@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AnswersSchema, CategorySchema, GateResultSchema, PhaseStatusSchema } from "./types";
 import type { AnswerValue, PartyQuestion, Question, Source } from "./types";
 import type { ChallengeQuestion } from "./challenge";
+import type { DocOrigin } from "./llm/verify";
 import type { Provenance } from "./llm/provenance";
 
 /* ============================================================
@@ -78,6 +79,8 @@ export const ExtractedDocSchema = z.object({
   docId: z.string().min(1),
   name: z.string(),
   pages: z.array(PageSchema).min(1),
+  /** Defaults to "pdf" so an older client body still validates. */
+  origin: z.enum(["pdf", "text", "image"]).default("pdf"),
 });
 
 export const EvidenceRequestSchema = z.object({
@@ -104,6 +107,8 @@ export type EvidenceFinding = {
   docId: string;
   docName: string;
   page: number;
+  /** "image" means this quote came off a transcript, not a document. */
+  origin: DocOrigin;
   observation: string;
   /** Coerced to the gate's answerType, or null if it would not coerce. */
   proposedAnswer: AnswerValue | null;
@@ -145,6 +150,8 @@ const FindingInputSchema = z.object({
   correctable: z.boolean(),
   escalate: z.boolean(),
   docName: z.string().default(""),
+  /** Defaults to "pdf" so an older client body still validates. */
+  origin: z.enum(["pdf", "text", "image"]).default("pdf"),
 });
 
 export const ChallengeRequestSchema = z.object({
@@ -176,5 +183,7 @@ export type Disagreement = {
   quote: string;
   docName: string;
   page: number;
+  /** So the handoff note can say a quote was read off a screenshot. */
+  origin: DocOrigin;
   reason: "REJECTED" | "ESCALATED";
 };

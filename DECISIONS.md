@@ -1,5 +1,5 @@
 # DECISIONS.md
-Last updated: 1200HR by Tung Geng Hong
+Last updated: 1400HR by Tung Geng Hong
 Rule: if a decision isn't in this file, it didn't happen. Update within the hour, not at end of day.
 
 ## 1. Track
@@ -368,7 +368,7 @@ Four gates pair an open "what/how" question with a yes-no or "Yes — …" input
 wording or the answer type; dev does not guess. Also still open:
 `boc_payment_due`'s evidence block is dev-authored and needs legal sign-off.
 
-### F3. Challenge round — make the point visible
+### F3. Challenge round — make the point visible (COMPLETED)
 
 The ranking is a documented five-tier order, but the user never sees it, so it
 reads as arbitrary. Two changes, both cheap, both aimed at "what is the point if
@@ -395,7 +395,7 @@ contradictions expanded, corroborations collapsed behind "N things your document
 back up". Reject-everything walked end to end — terminates, and the disagreement
 record survives with its quote and document name.
 
-### F4. Demo fixtures — Scenario A and Scenario B (Ding Jie)
+### F4. Demo fixtures — Scenario A and Scenario B (COMPLETED)
 
 - Live in **`src/config/scenarios.json`, not `rules.json`** — rules.json is
   validated at import and throws, so a typo in demo data would take down the
@@ -421,7 +421,7 @@ and no existing proceedings. Both scenarios initially pass current rules,
 enforced by `src/lib/scenarios.test.ts`. Scenario B's separate document-driven
 PASS-to-FAIL demonstration remains to be finalised with legal.
 
-### F5. General eligibility gates — five additions (Ding Jie)
+### F5. General eligibility gates — five additions (COMPLETED)
 
 All fit the existing schema; no new gate types. Legal authors, dev publishes.
 
@@ -494,7 +494,7 @@ requests covering the branches, and a headless browser walkthrough of minor
 representation, memorandum boundaries, party amount edits and insolvency copy.
 Evidence API validation used the labelled stub, not a paid live model call.
 
-### F6. Review page — readable labels and colour (Ding Jie)
+### F6. Review page — readable labels and colour (COMPLETED)
 
 - `GateResult` carries `question` from the server. The client has no rules
   access, so any client-side gateId→question map is a second source of truth.
@@ -519,7 +519,7 @@ Per-gate outcome colours use the agreed PASS/CONDITIONAL/WEAKNESS/MISSING/FAIL
 palette with an explicit text label. Form submit controls and field-local
 actions receive spacing from the preceding input.
 
-### F7. Multiple documents — up to five
+### F7. Multiple documents — up to five (COMPLETED)
 
 - UI states the limit explicitly ("up to 5 files").
 - `docId` flows through the finding and the quote verifier, which currently
@@ -540,22 +540,239 @@ matching, never claimed by the model, so a wrong attribution is impossible rathe
 than merely unlikely. Verified across a three-document bundle: findings resolved
 correctly to quotation.pdf and receipt.pdf, zero drops.
 
-### F8. Cleanup
+### F8. Cleanup (COMPLETE)
 
-- Delete `src/lib/mock-verdict.ts` — dead code, nothing imports it.
+- Delete `src/lib/mock-verdict.ts` — dead code, nothing imports it. **[x] Deleted.**
 - Drop the inline `[demo fixture]` prefix from stub observations; keep the
-  banner. Two signals reads as noise.
+  banner. Two signals reads as noise. **[x] Already done; only the banner remains.**
 - Distinguish **"never configured"** (a setup error — say so before the user
   uploads anything) from **"the call failed"** (stub and label it, per §8).
+  **[x] Partly, and deliberately.** No key is caught by `isStubbed()` before any
+  call, so the claimant gets the labelled fixture and the banner — never an
+  error. Everything that reaches `LlmUnavailableError` is therefore a *live*
+  failure (timeout, unreachable, 401/402), and the 503 copy no longer asserts
+  "not configured" for it. The cause is logged server-side; the claimant is told
+  the check could not be reached and that their eligibility result is unaffected.
 - Stale READMEs in `api/evaluate/` and `config/` describe field names that no
-  longer exist.
+  longer exist. **[x] Both rewritten** against the code as it now stands.
+  `config/README.md` now documents the `evidence` block and states what the
+  model is and is not sent.
 
-## 4. Scope + cut-line
-IN (MVP, in priority order):
+### F9. Handoff notes — the Escalation requirement (COMPLETE)
 
-CUT-LINE (decided in advance, executed at T-minus [x]): 
+§Sprint 3 left this "Recommended; not yet decided". Decided and built
+2026-09-06: **"Where we still disagree" is now the handoff brief**, renamed
+"Handoff notes — for the person who helps you next". Epic 3 stays abandoned.
 
-OUT: 
+The challenge statement asks for four things; the section now carries all four:
+the issue (the gate's question plus why it needs judgement), the documents
+behind it (the verified quote, its document and page), what the tool already
+established, and the disagreement stated as a decision for a human.
+
+- **"What this tool established"** is counts of facts only — checks passed,
+  conditions to meet, points unanswered, documents read, findings verified,
+  findings discarded. Never a score. §8 forbids outcome prediction and F6
+  forbids aggregating per-gate colour; a percentage here would breach both.
+- **Copy and print.** A handoff nobody can hand off is not a handoff. `Copy
+  these notes` serialises the section as plain text; `Print or save as PDF`
+  uses a print stylesheet that drops the app chrome and keeps the record.
+- **The clause per item was cut** from this increment (team call, T-2h). The
+  gate's `source` is already on screen elsewhere on the review page.
+
+### F10. Screenshots — WhatsApp threads as evidence (COMPLETE)
+
+**Why it is not just another file type.** Quote verification works because a
+PDF's text is extracted mechanically: the model cannot fake a quote into text
+it did not write. A screenshot has no text layer, so the text must be
+*produced*. Doing that in the findings call would make the check circular —
+the model marking its own homework, while knowing exactly what the case needs.
+
+**The duties are therefore split.** `transcribeImage()` is a separate call
+given the image and nothing else: no gates, no answers, no claim. It
+transcribes and stops. The existing findings call then runs over that
+transcript as ordinary text, unchanged. Verification is still a check between
+two things the same model did not both author.
+
+This is **weaker than a text-layer PDF and the UI says so.** The transcript is
+shown to the claimant before it is used ("check this"), because a transcript is
+a reading, not an extraction, and a misreading carries through. Screenshots are
+also trivially fabricated; the tool cannot authenticate one, so an
+image-derived quote is labelled "read from a screenshot, not authenticated"
+wherever it appears, including in the handoff notes.
+
+**Image-only PDFs are the real case.** The team's actual test data is not PNGs
+— it is `scenario_A_whatsapp.pdf` / `scenario_B_whatsapp.pdf`, each a
+single-page PDF holding one JPEG and zero fonts. That is what you get when a
+chat thread is printed or exported, and it is how a WhatsApp thread will
+usually arrive. So `extractFromPdf` no longer refuses a PDF with no text layer:
+it falls back to the same transcription path. **The text layer is still
+preferred wherever it exists** — mechanical, free, and a stronger guarantee
+than a reading.
+
+The PDF goes to the model natively as a `file` content part rather than being
+rasterised or having its bitmap dug out: no PDF parsing, no rasteriser on
+Vercel, and multi-page falls out for free. Capped at `MAX_TRANSCRIBE_PAGES`
+(10) and 6MB, because each page is billed as an image and a 40-page scan is a
+bill arriving quietly.
+
+*Bug found by testing, not by reading*: pdf.js **detaches the buffer it is
+handed**, so after `getDocumentProxy(bytes)` the original array is empty and
+base64-encodes to `""` — the transcription call then failed with "Invalid
+base64 data URL". `getDocumentProxy` now gets a copy so `bytes` survives for
+the fallback. Nothing in the type system would have caught this.
+
+**Implementation**: `origin: "pdf" | "text" | "image"` is set at ingest and
+travels through `SourceDoc` → `QuoteLocation` → the finding → the challenge
+question → the disagreement, so no surface can accidentally show a transcript
+as a document. PNG/JPEG/WebP, 6MB per image (lower than the 10MB PDF cap —
+base64 inflates the body ~1.33x and vision tokens are billed by area).
+`MAX_DOCS` is unchanged, so five screenshots is already the limit.
+
+*An unreadable image is refused, not passed through.* The transcription prompt
+asks for `[unreadable]` rather than a guess, so "nothing was read" arrives as
+markers rather than an empty string; `hasReadableText()` catches both. Without
+it a blank transcript would reach the verifier, match no quote, and read to the
+claimant as "your document showed nothing" when the truth is "we could not read
+your document". Pure, and split into `lib/transcript.ts` so it is testable
+without a network — same reason `verify.ts` is separate.
+
+**Verified live against the team's own test PDFs (2026-09-06)**, not stubbed.
+Both `scenario_A_whatsapp.pdf` and `scenario_B_whatsapp.pdf` transcribe
+verbatim — dates, timestamps, per-message sender attribution, Singlish and
+emoji all intact — and run the full pipeline with **zero dropped findings**:
+
+- **Scenario A**: 3 findings, all CORROBORATES (`boc_payment_due`,
+  `boc_notice_given`, `boc_subject_matter`). Correct for a sound claim.
+- **Scenario B**: 5 findings, 2 of them CONTRADICTS
+  (`gen_claim_amount_max`, `boc_quality`), and a 5-question challenge round.
+
+43 unit tests pass, including four pinning that a fabricated quote is still
+dropped when the source is a transcript.
+
+**Verdict flips from a WhatsApp PDF: supported, and proven.** Nothing needed
+building — the six published gates that are `FAIL` severity *and* checkable
+*and* correctable are `gen_claim_amount_max`, `gen_minor_representation`,
+`gen_respondent_in_singapore`, `gen_existing_proceedings`,
+`boc_proof_of_agreement` and `boc_consideration`. Any of them flips the verdict
+when a document contradicts it and the claimant confirms the correction. The
+transcript is ordinary text by that point, so its being a screenshot changes
+nothing.
+
+What Scenario B lacks is **content**, not capability: its thread contains no
+fact that contradicts any of those six. Verified by appending one line to the
+transcript — *"I already filed the case at the Magistrate's Court last week"* —
+which produced a CONTRADICTS on `gen_existing_proceedings` with a coercible
+proposal of `true`, and confirming it took the general phase **PASS → FAIL**,
+end to end from the PDF. Legal adds one line of that shape to the artwork and
+the climax runs off the real export. `gen_respondent_in_singapore` ("we've
+moved operations to KL") works the same way and is equally natural to the story.
+
+### Ingest latency — "it feels like it hangs" (2026-09-06)
+
+Measured before changing anything: **~8.3s** to read one image-only PDF, and
+**~17.7s** for the evidence check. So the claimant waits ~26s across two steps.
+Two causes, only one of them the algorithm.
+
+**1. Files were read one after another.** `for (const file of files) { await … }`
+meant five screenshots cost 5 × 8s ≈ 40s. They are independent, so they now go
+through `Promise.all` — which also preserves input order, and `capBundle`
+depends on that order. Measured: two PDFs went **16s → 8.3s**, the same as one.
+Type validation moved ahead of the reads, so an unreadable fifth file no longer
+costs four paid transcriptions before it is rejected.
+
+**2. Nothing on screen said anything.** `reading` only disabled the file input
+and relabelled the *paste* button, so uploading a PDF changed nothing visible
+for eight seconds. Silence during a slow step reads as a crash, and a claimant
+who reloads pays for the work twice. Both slow steps now show a status block
+(`role="status"`, `aria-live="polite"`) naming the files, explaining that a
+picture has to have its words read off the page, and saying they are read at
+the same time rather than in turn. This was the larger half of "it hangs".
+
+**Rejected: `reasoning: {effort: "low"}` on transcription.** The findings call
+uses it, so it looked like free speed. Measured: **8.28s vs 8.14s — nothing.**
+This call is output-token-bound, not thinking-bound (29 reasoning tokens against
+a ~550-token transcript). It also appeared to cost fidelity: the sender came
+back as "Jasmine" rather than "Jasmine (Huat Huat Huat)", and who the respondent
+is matters. Reverted, and the reason left in the code so it is not re-attempted.
+
+**What is left, and why it is not being touched at T-1h.** The remaining ~8.3s
+is the transcript itself — the model writing out ~550 tokens, which is the
+product. The 17.7s check is prompt-size-bound: 22 checkable gates plus the
+document. Fewer, better-targeted `checkable` gates would shorten it (§Evidence
+planned ~6, legal published 22), but that is a `rules.json` change needing
+re-testing, not a submission-eve edit.
+
+### Run-to-run variance — measured, not guessed (2026-09-06)
+
+Four identical `/api/evidence` calls on `scenario_B_whatsapp.pdf`, same model,
+no sampling parameters available to pin (Sonnet 5 rejects `temperature`):
+
+| | run 1 | run 2 | run 3 | run 4 |
+|---|---|---|---|---|
+| findings | 3 | 4 | 4 | 4 |
+| dropped | 0 | 0 | 0 | 0 |
+| contradictions | 1 | 2 | 2 | 4 |
+
+Nine distinct gates appeared across the four runs; only one appeared in all
+four. **Set stability 1/9 = 11%.**
+
+**But the headline is stable and the tail is not**, which is the distinction
+that matters. `gen_claim_amount_max` came back CONTRADICTS in **4/4 runs with
+the same substance** every time: the claimant says she is claiming $1,500, and
+the thread indicates the $1,500 was the half already paid to her, with the
+dispute actually about the unpaid remainder. That is a correct, non-obvious
+challenge to the claimant's own framing — precisely what §2 exists to do. What
+varies is the supporting cast of WEAKNESS-gate findings beneath it.
+
+Nothing observed in any run was *wrong*. The variance is in which true
+observations get surfaced, not in their correctness, and every run produced at
+least one contradiction with the same headline.
+
+**Prompt fix attempted and rejected.** Replacing "Report at most N findings"
+with an explicit instruction to work through every item and prefer completeness
+over brevity made it **worse**: the candidate pool grew 9 → 13, and
+`gen_claim_amount_max` fell from 4/4 to 1/4, with one run surfacing no
+contradiction at all. Reverted. Recorded so nobody retries it.
+
+**Consequences owned:**
+- Do not script the demo to a named finding. "It found N things that do not
+  match" and then read what is on screen. The headline challenge is reliable;
+  the specific list is not.
+- The deterministic layers are unaffected and this is what the pitch rests on:
+  `evaluate()`, quote verification, coercion, ranking and gate selection are
+  all code. **0 dropped in 8 of 8 runs.**
+- The real fix is not a prompt: run the findings call more than once and union
+  the verified results, trading latency and spend for coverage. Post-hackathon
+  — it doubles the ~10s call and was not attempted at T-1h.
+
+*Diagnostics added*: the evidence route now warns when a proposal is dropped
+because it would not coerce, so "no correction was offered" can be told apart
+from "we rejected what the model proposed". On these threads it was always the
+former — the model declining, never a coercion failure.
+
+**Superseded — Scenario B's contradictions carry no proposed answer.**
+Both came back with `proposedAnswer: null`, so the round asks the question but
+cannot offer the one-click "Yes — use my document" correction, and nothing
+flips the verdict on its own. That is the model declining to put a number on
+"how much are you claiming" from a thread where the only figure is the 1.5k the
+other side says it will not ask back — defensible behaviour, not a bug. But it
+means **the PASS → FAIL climax does not currently fire from these PDFs alone.**
+The verified flip is on `boc_consideration` (see F5 correction above). Either
+rehearse the flip through the pre-loaded fixture as before, or have legal add a
+line to Scenario B's thread that speaks directly to a FAIL-severity checkable
+gate. Decide before the run-through, not on stage.
+
+**Known limit, worth saying before a judge asks**: sender attribution depends
+on bubble alignment, and "You" in a WhatsApp export is the phone's owner — the
+tool cannot verify that is the claimant.
+
+## 4. Scope + cut-line — CUT (2026-09-06)
+
+Never filled in, and by submission there is nothing left to cut. The priority
+order that would have lived here is the F1–F8 list above; the cut decisions
+actually taken are recorded where they were made (Epic 3 abandoned in §Sprint 3;
+"drop the challenge round" in §Evidence). Section numbers below are unchanged —
+they are referenced throughout this file and in code comments.
 
 ## 5. Ground rules of law (source of truth — cite in-app)
 Small Claims Tribunals Act 1984, Schedule; State Courts / ask.gov.sg guidance.
@@ -564,8 +781,12 @@ Any rule change goes in this file AND in `rules.json`.
 ## 6. Eligibility logic lives in ONE place
 `/config/rules.json` — written by legal, imported by code. Not a Google Doc.
 Anyone editing it announces it in the team channel.
-- Scaffold location: `web/config/rules.json` — five empty draft gates; legal details pending.
-- Draft or incomplete gates must not produce an eligibility verdict. Data shape to be agreed with the Zod schema/evaluator owner.
+- Actual location: `web/src/config/rules.json` — 8 published general gates,
+  23 breach-of-contract gates, and the party/filing intake fields.
+- Draft or incomplete gates must not produce an eligibility verdict. Enforced:
+  only `status: "published"` gates are evaluated, and `RulesFileSchema` throws at
+  import — naming the offending gate id — rather than failing at runtime.
+- See `web/src/config/README.md` for the field-by-field authoring reference.
 
 ## 7. Demo scenarios (2, chosen by failure mode not topic)
 - **A — sound claim:** claimant's documents support their case and assumptions, which the LLM validates

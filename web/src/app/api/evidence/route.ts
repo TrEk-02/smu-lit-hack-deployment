@@ -104,6 +104,18 @@ export async function POST(req: Request) {
         ? null
         : coerceProposedAnswer(finding.proposedAnswer, gate.answerType, gate.options);
 
+    // Two very different things both end up as `proposed === null`: the model
+    // declining to propose, and us rejecting what it proposed. Only the second
+    // is a problem we can fix, and without this line they are indistinguishable
+    // from the outside — which is what made "no correction was offered" hard to
+    // diagnose on the WhatsApp threads (DECISIONS.md §F10).
+    if (finding.proposedAnswer !== null && proposed === null) {
+      console.warn(
+        `[evidence] dropped an uncoercible proposal for ${gate.id} (${gate.answerType}):`,
+        JSON.stringify(finding.proposedAnswer)
+      );
+    }
+
     const escalate = gate.evidence.onContradiction === "ESCALATE";
 
     findings.push({
@@ -115,6 +127,7 @@ export async function POST(req: Request) {
       docId: finding.location.docId,
       docName: finding.location.docName,
       page: finding.location.page,
+      origin: finding.location.origin,
       // Document text is untrusted input. An injected screed cannot reach the
       // claimant as a wall of text, and cannot claim more than one sentence.
       observation: finding.observation.slice(0, MAX_OBSERVATION_CHARS),

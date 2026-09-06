@@ -43,6 +43,7 @@ function finding(gateId: string, over: Partial<FindingLike> = {}): FindingLike {
     correctable: true,
     escalate: false,
     docName: "invoice.pdf",
+    origin: "pdf",
     ...over,
   };
 }

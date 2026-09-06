@@ -126,3 +126,131 @@ export async function requestFindings(briefs: GateBrief[], docs: SourceDoc[]): P
   }
   return result.data;
 }
+
+/* ============================================================
+ * TRANSCRIPTION — a deliberately separate call.
+ *
+ * Screenshots (WhatsApp threads, most often) have no text layer,
+ * so there is nothing to extract mechanically. The text has to
+ * be produced. This covers two shapes of the same problem: an
+ * image file, and an image-only PDF — which is what you get when
+ * someone exports or prints a chat thread, and is by far the
+ * commoner of the two in practice.
+ *
+ * That is a problem for quote verification. Its guarantee holds
+ * because the document text comes from a source independent of
+ * the model: the model cannot fake a quote into text it did not
+ * write. If one call both transcribed the image AND generated
+ * findings against it, the check would be circular — the model
+ * marking its own homework, while knowing exactly what would be
+ * convenient to find.
+ *
+ * So the duties are split. This call is given the image and
+ * nothing else: no gates, no answers, no claim, no idea what the
+ * case needs. It transcribes and stops. The findings call then
+ * runs over the transcript as ordinary text, unchanged.
+ *
+ * This is weaker than a text-layer PDF and we say so in the UI —
+ * a transcript is a reading of an image, and the claimant is
+ * shown it so they can catch a misreading before it is used.
+ * ============================================================ */
+
+const TRANSCRIBE_PROMPT = `You transcribe images of documents and chat threads.
+
+Rules:
+- Output the text you can see, verbatim. Nothing else.
+- For a chat screenshot, keep every message on its own line, in order, as:
+  [time] Sender: message
+  Use the sender name exactly as shown. Who said what is the whole point —
+  never merge, reattribute, or summarise messages.
+- Keep timestamps, dates, amounts and reference numbers exactly as written.
+- Do not correct spelling, expand abbreviations, translate, or tidy grammar.
+- Do not describe the image, add commentary, or explain anything.
+- Never guess at text that is cut off, blurred, or covered. Write [unreadable].
+- If you can read no text at all, output nothing.`;
+
+/** Image types we accept. A PDF gets here only after its text layer comes up empty. */
+export const TRANSCRIBABLE_MIME = ["image/png", "image/jpeg", "image/webp"] as const;
+
+/**
+ * The content part for one document. Images go as `image_url`; PDFs go as a
+ * `file` part, which the model reads natively — page by page, as images. That
+ * saves us extracting the embedded bitmap out of the PDF or shipping a
+ * rasteriser, and it handles a multi-page export for free.
+ */
+function contentPart(base64: string, mime: string, name: string) {
+  return mime === "application/pdf"
+    ? { type: "file", file: { filename: name, file_data: `data:application/pdf;base64,${base64}` } }
+    : { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } };
+}
+
+/**
+ * A transcript for a stubbed run — a short WhatsApp thread, so the demo path
+ * exercises ingestion, verification and the findings call with no key set.
+ */
+function stubTranscript(): string {
+  return [
+    "[10:14] Me: Hi, just checking on the order — it was meant to arrive last Friday.",
+    "[10:31] Supplier: Sorry for the delay. We'll get it to you this week.",
+    "[10:32] Me: That's the second time. Can you confirm the agreed price still stands?",
+    "[11:02] Supplier: We never agreed a fixed price for this one, it was supplied free of charge as a sample.",
+  ].join("\n");
+}
+
+export async function transcribeDocument(
+  base64: string,
+  mime: string,
+  name: string
+): Promise<string> {
+  if (isStubbed()) return stubTranscript();
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new LlmUnavailableError("OPENROUTER_API_KEY is not set");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(ENDPOINT, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "X-Title": "SCT pre-filing guide (SMU LIT Hackathon)",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
+        // No `reasoning` here, deliberately. Setting it to "low" was measured
+        // against the findings call's precedent and bought nothing — 8.3s
+        // either way, because this call is output-token-bound, not thinking-
+        // bound (29 reasoning tokens on a 550-token transcript). It did appear
+        // to cost fidelity: the sender came back as "Jasmine" rather than
+        // "Jasmine (Huat Huat Huat)", and who the respondent is matters.
+        messages: [
+          { role: "system", content: TRANSCRIBE_PROMPT },
+          {
+            role: "user",
+            content: [contentPart(base64, mime, name)],
+          },
+        ],
+      }),
+    });
+  } catch (error) {
+    const reason = error instanceof Error && error.name === "AbortError" ? "timed out" : "unreachable";
+    throw new LlmUnavailableError(`OpenRouter ${reason} while transcribing "${name}"`);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    const Failure = response.status === 401 || response.status === 402 ? LlmUnavailableError : LlmBadOutputError;
+    throw new Failure(`OpenRouter returned ${response.status} transcribing "${name}": ${detail.slice(0, 300)}`);
+  }
+
+  const body = await response.json().catch(() => null);
+  const content = body?.choices?.[0]?.message?.content;
+  return typeof content === "string" ? content.trim() : "";
+}

@@ -20,7 +20,9 @@ import type {
   Answers,
   Category,
   PartyQuestion,
+  PhaseVerdict,
   Question,
+  Verdict,
 } from "@/lib/types";
 
 type ConfigResponse = {
@@ -550,6 +552,7 @@ export default function Home() {
               quote: question.evidence!.quote,
               docName: question.evidence!.docName,
               page: question.evidence!.page,
+              origin: question.evidence!.origin,
               reason: question.kind === "ESCALATED" ? "ESCALATED" : "REJECTED",
             },
           ]);
@@ -671,7 +674,11 @@ export default function Home() {
           )}
 
           {disagreements.length > 0 && (
-            <DisagreementSummary disagreements={disagreements} />
+            <HandoffNotes
+              disagreements={disagreements}
+              verdict={verdict}
+              evidence={evidenceResult}
+            />
           )}
 
           <PartyDetailsSummary
@@ -1162,23 +1169,175 @@ function ProvenanceSummary({ evidence }: { evidence: EvidenceResponse }) {
 
 /*
  * ------------------------------------------------------------
- * Disagreements (Sprint 2, Feature 3)
+ * Handoff notes (Sprint 3 — the Escalation requirement)
+ *
+ * The challenge statement asks each build to produce a handoff
+ * brief: the issue, the documents behind it, what the tool already
+ * established, and the specific question that needs human judgement.
+ * Epic 3 was abandoned (DECISIONS.md §Sprint 3), so this section IS
+ * the terminal artifact — it has to stand on its own rather than
+ * read as a stub for something later.
  *
  * A verified contradiction the claimant rejected is not dropped.
- * Their answer stands, and both sides are carried into the Sprint 3
- * handoff brief so a real person sees them.
+ * Their answer stands, and both sides travel to the human.
  * ------------------------------------------------------------
  */
 
-function DisagreementSummary({ disagreements }: { disagreements: Disagreement[] }) {
+/**
+ * Counts of facts, never a score. Six ambers must not start reading as
+ * "60% likely to lose" — that is outcome prediction, which §8 forbids and
+ * F6 forbids again for colour. Every line here is a tally of something the
+ * engine actually decided, or something the verifier actually did.
+ */
+function establishedFacts(
+  verdict: Verdict,
+  evidence: EvidenceResponse | null
+): { label: string; value: string }[] {
+  const phases: PhaseVerdict[] = [verdict.general, verdict.category].filter(
+    (phase): phase is PhaseVerdict => Boolean(phase)
+  );
+  const checks = phases.flatMap((phase) => phase.results);
+  const passed = checks.filter((result) => result.outcome === "PASS").length;
+
+  const facts = [
+    { label: "Eligibility position", value: REVIEW_STATUS_COPY[reviewStatus(verdict)] },
+    { label: "Checks passed", value: `${passed} of ${checks.length}` },
+  ];
+
+  const conditional = phases.flatMap((phase) => phase.conditional).length;
+  if (conditional > 0) {
+    facts.push({ label: "Conditions to meet first", value: String(conditional) });
+  }
+
+  const missing = phases.flatMap((phase) => phase.missing).length;
+  if (missing > 0) {
+    facts.push({ label: "Points left unanswered", value: String(missing) });
+  }
+
+  if (evidence) {
+    facts.push({
+      label: "Documents read",
+      value: String(evidence.docIds.length),
+    });
+    facts.push({
+      label: "Findings verified against those documents",
+      value: String(evidence.findings.length),
+    });
+    // The number that makes the guarantee checkable rather than asserted.
+    // Zero is worth stating too — it means nothing had to be thrown away.
+    facts.push({
+      label: "Unverifiable findings discarded",
+      value: String(evidence.droppedFindings),
+    });
+  }
+
+  return facts;
+}
+
+const REVIEW_STATUS_COPY: Record<string, string> = {
+  PASS: "Can proceed",
+  CONDITIONAL: "Can proceed if a condition is met",
+  INCOMPLETE: "Not yet assessable",
+  FAIL: "Cannot proceed to the Tribunal",
+};
+
+/** Plain text, so the note can leave the browser and reach a real person. */
+function handoffText(
+  disagreements: Disagreement[],
+  facts: { label: string; value: string }[]
+): string {
+  const lines: string[] = [
+    "HANDOFF NOTES — Small Claims Tribunal pre-filing check",
+    "Prepared by a guidance tool. Not legal advice, and no view is offered on",
+    "the outcome or the value of this claim.",
+    "",
+    "WHAT THE TOOL ESTABLISHED",
+    ...facts.map((fact) => `  ${fact.label}: ${fact.value}`),
+    "",
+    `FOR A PERSON TO DECIDE (${disagreements.length})`,
+    "",
+  ];
+
+  // Say it once, plainly, and only when it applies. A screenshot is text we
+  // read off a picture: we cannot tell whether the conversation is genuine,
+  // and neither the tool nor these notes should imply otherwise.
+  if (disagreements.some((item) => item.origin === "image")) {
+    lines.splice(
+      lines.indexOf("FOR A PERSON TO DECIDE (" + disagreements.length + ")"),
+      0,
+      "Some quotes below were read off screenshots. The tool transcribes what it",
+      "can see; it cannot confirm a screenshot is a genuine, unedited conversation.",
+      ""
+    );
+  }
+
+  disagreements.forEach((item, index) => {
+    lines.push(
+      `${index + 1}. ${item.question}`,
+      `   Why it needs judgement: ${
+        item.reason === "ESCALATED"
+          ? "the tool does not characterise this — it is a judgement call"
+          : "the claimant stands by their answer, and their document appears to say otherwise"
+      }`,
+      `   The claimant says: ${item.claimantAnswer}`,
+      `   The document suggests: ${item.observation}`,
+      item.origin === "image"
+        ? `   Quoted from ${item.docName || "a screenshot"} — text read off an image, not authenticated:`
+        : `   Quoted from ${item.docName || "their document"}, page ${item.page}:`,
+      `   “${item.quote}”`,
+      ""
+    );
+  });
+
+  return lines.join("\n");
+}
+
+function HandoffNotes({
+  disagreements,
+  verdict,
+  evidence,
+}: {
+  disagreements: Disagreement[];
+  verdict: Verdict;
+  evidence: EvidenceResponse | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const facts = establishedFacts(verdict, evidence);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(handoffText(disagreements, facts));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Clipboard denied (insecure context, or the user said no). Printing
+      // still works, and the notes are on screen either way.
+      setCopied(false);
+    }
+  }
+
   return (
     <section className="results">
-      <h2>Where we still disagree</h2>
+      <h2>Handoff notes — for the person who helps you next</h2>
 
       <p className="hint">
-        You kept your answer on these. We have kept it too — and noted why your
-        document appeared to say otherwise, so whoever helps you next sees both.
+        Where we still disagree. You kept your answer on these, and we have kept
+        it too — alongside what your document appeared to say, so whoever helps
+        you next sees both sides rather than just ours.
       </p>
+
+      <h3>What this tool established</h3>
+
+      <div className="summary">
+        {facts.map((fact) => (
+          <div key={fact.label}>
+            <strong>{fact.label}</strong>
+            <span>{fact.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <h3>For a person to decide</h3>
 
       {disagreements.map((item) => (
         <article className="gate-result" key={`${item.gateId}-${item.reason}`}>
@@ -1188,6 +1347,12 @@ function DisagreementSummary({ disagreements }: { disagreements: Disagreement[] 
               {item.reason === "ESCALATED" ? "For a person to review" : "You disagreed"}
             </span>
           </div>
+
+          <p className="hint">
+            {item.reason === "ESCALATED"
+              ? "This tool does not characterise this point — it is a judgement call."
+              : "The claimant stands by their answer. Their document appears to say otherwise."}
+          </p>
 
           <div className="status-row">
             <strong>Your answer</strong>
@@ -1199,11 +1364,28 @@ function DisagreementSummary({ disagreements }: { disagreements: Disagreement[] 
           <blockquote className="quote">
             “{item.quote}”
             <cite>
-              {item.docName || "your document"}, page {item.page}
+              {item.origin === "image"
+                ? `${item.docName || "a screenshot"} — read from a screenshot, not authenticated`
+                : `${item.docName || "your document"}, page ${item.page}`}
             </cite>
           </blockquote>
         </article>
       ))}
+
+      <div className="actions">
+        <button type="button" className="secondary" onClick={copy}>
+          {copied ? "Copied ✓" : "Copy these notes"}
+        </button>
+        <button type="button" className="secondary" onClick={() => window.print()}>
+          Print or save as PDF
+        </button>
+      </div>
+
+      <p className="hint">
+        Take these notes to a lawyer, a Legal Aid clinic, or the Tribunal
+        registry. They are a record of what you told us and what your documents
+        said — not a view on whether you will win.
+      </p>
     </section>
   );
 }

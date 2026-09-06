@@ -60,6 +60,7 @@ test("a genuine quote survives and resolves its document and page", () => {
     docId: "doc_invoice",
     docName: "invoice.pdf",
     page: 1,
+    origin: "pdf",
   });
 });
 
@@ -118,4 +119,72 @@ test("a mixed batch keeps the real finding and drops the invented one", () => {
   assert.equal(result.kept.length, 1);
   assert.equal(result.kept[0].gateId, "boc_price_agreed");
   assert.equal(result.dropped, 1);
+});
+
+/*
+ * ------------------------------------------------------------
+ * Screenshots (Sprint 3)
+ *
+ * A screenshot's text is transcribed by a model rather than
+ * extracted from a file, which is exactly why the duties are
+ * split: the transcription call never sees the claim, and by
+ * the time the findings model runs, the transcript is just
+ * text. These tests pin the consequence — verification does
+ * not get weaker because the source was an image.
+ * ------------------------------------------------------------
+ */
+
+const SCREENSHOT: SourceDoc = {
+  docId: "doc_chat",
+  name: "whatsapp.png",
+  origin: "image",
+  pages: [
+    {
+      page: 1,
+      text: [
+        "[10:14] Me: the order was meant to arrive last Friday",
+        "[11:02] Supplier: we never agreed a fixed price, it was supplied free of charge",
+      ].join("\n"),
+    },
+  ],
+};
+
+test("a quote from a screenshot transcript verifies, and carries its origin", () => {
+  const result = verifyFindings(
+    [finding({ gateId: "boc_consideration", quote: "we never agreed a fixed price" })],
+    [SCREENSHOT]
+  );
+
+  assert.equal(result.dropped, 0);
+  assert.deepEqual(result.kept[0].location, {
+    docId: "doc_chat",
+    docName: "whatsapp.png",
+    page: 1,
+    origin: "image",
+  });
+});
+
+test("a fabricated quote is still dropped when the source is a transcript", () => {
+  const result = verifyFindings(
+    [finding({ gateId: "boc_consideration", quote: "Supplier: I admit we breached the contract" })],
+    [SCREENSHOT]
+  );
+
+  assert.equal(result.kept.length, 0);
+  assert.equal(result.dropped, 1);
+});
+
+test("a transcript quote is not matched against a different document", () => {
+  const result = verifyFindings(
+    [finding({ gateId: "boc_consideration", quote: "we never agreed a fixed price" })],
+    [INVOICE, EMAIL]
+  );
+
+  assert.equal(result.kept.length, 0);
+  assert.equal(result.dropped, 1);
+});
+
+test("a document with no origin is treated as a pdf, not as a transcript", () => {
+  const result = verifyFindings([finding()], DOCS);
+  assert.equal(result.kept[0].location.origin, "pdf");
 });
